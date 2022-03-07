@@ -8,7 +8,7 @@ public class PrimaryButtonEvent : UnityEvent<bool> { }
 
 public class PrimaryButtonWatcher : MonoBehaviour
 {
-    public PrimaryButtonEvent primaryButtonPress;
+    public PrimaryButtonEvent primaryButtonPress; // object accessed as a variable of Unity script (BallController's watcher)
 
     private bool lastButtonState = false;
     private List<InputDevice> devicesWithPrimaryButton;
