@@ -30,6 +30,54 @@ struct RainPacket {
     char   mess[256];
 };
 
+char** str_split(char* a_str, const char a_delim)
+{
+    char** result    = 0;
+    size_t count     = 0;
+    char* tmp        = a_str;
+    char* last_comma = 0;
+    char delim[2];
+    delim[0] = a_delim;
+    delim[1] = 0;
+
+    /* Count how many elements will be extracted. */
+    while (*tmp)
+    {
+        if (a_delim == *tmp)
+        {
+            count++;
+            last_comma = tmp;
+        }
+        tmp++;
+    }
+
+    /* Add space for trailing token. */
+    count += last_comma < (a_str + strlen(a_str) - 1);
+
+    /* Add space for terminating null string so caller
+       knows where the list of returned strings ends. */
+    count++;
+
+    result = malloc(sizeof(char*) * count);
+
+    if (result)
+    {
+        size_t idx  = 0;
+        char* token = strtok(a_str, delim);
+
+        while (token)
+        {
+            assert(idx < count);
+            *(result + idx++) = strdup(token);
+            token = strtok(0, delim);
+        }
+        assert(idx == count - 1);
+        *(result + idx) = 0;
+    }
+
+    return result;
+}
+
 int main(int argc, char *argv[])
 {
     int sk;
@@ -118,6 +166,36 @@ int main(int argc, char *argv[])
         // Display that we have received message
         format_addr(addr_str_buff, remote_addr);
         printf("rain1 received %d byte message from %s: %s", bytes, addr_str_buff, mess);
+        //parse string into position
+        char** tokens = str_split(mess, ',');
+
+        if (tokens)
+        {
+            int i;
+            for (i = 0;  *(tokens + i); i++)
+            {
+                switch (i)
+                {
+                case 0:
+                    packet.x = strtod(*(tokens + i));
+                    break;
+                case 1:
+                    packet.y = strtod(*(tokens + i));
+                    break;
+                case 2:
+                    packet.z = strtod(*(tokens + i));
+                    break;
+                
+                default:
+                    break;
+                }
+                free(*(tokens + i));
+            }2
+            free(tokens);
+        }
+        
+        printf("Controller pos: (%0.3f,%0.3f,%0.3f) ", packet.x, packet.y, packet.z);
+
         if (bytes && mess[bytes - 1] != '\n')
             printf("\n");
 
@@ -136,11 +214,11 @@ int main(int argc, char *argv[])
 
         // Update sphere position
         // t += 0.05;
-        printf("Controller pos: (%0.3f,%0.3f,%0.3f) ", packet.x, packet.y, packet.z);
         packet.flag = 1;
-        packet.x = packet.x;
-        packet.z = packet.y;
-        packet.y = packet.z;
+        packet.x = packet.x + 1000;
+        packet.z = packet.y + 1000;
+        packet.y = packet.z + 1000;
+        printf("Return pos: (%0.3f,%0.3f,%0.3f) ", packet.x, packet.y, packet.z);
     }
 }
 
