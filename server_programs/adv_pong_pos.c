@@ -181,10 +181,10 @@ int main(int argc, char *argv[])
                     packet.x = strtod(*(tokens + i), &pEnd);
                     break;
                 case 1:
-                    packet.y = strtod(*(tokens + i));
+                    packet.y = strtod(*(tokens + i), &pEnd);
                     break;
                 case 2:
-                    packet.z = strtod(*(tokens + i));
+                    packet.z = strtod(*(tokens + i), &pEnd);
                     break;
                 
                 default:
