@@ -14,6 +14,7 @@
 #include "spu_events.h"
 #include "spu_alarm.h"
 #include "math.h"
+#include <assert.h>
 
 #define SPINES_PORT 8100
 #define MAX_BYTES 100000
