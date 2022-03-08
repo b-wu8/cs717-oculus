@@ -172,12 +172,13 @@ int main(int argc, char *argv[])
         if (tokens)
         {
             int i;
+            char* pEnd;
             for (i = 0;  *(tokens + i); i++)
             {
                 switch (i)
                 {
                 case 0:
-                    packet.x = strtod(*(tokens + i));
+                    packet.x = strtod(*(tokens + i), &pEnd);
                     break;
                 case 1:
                     packet.y = strtod(*(tokens + i));
@@ -190,7 +191,7 @@ int main(int argc, char *argv[])
                     break;
                 }
                 free(*(tokens + i));
-            }2
+            }
             free(tokens);
         }
         
