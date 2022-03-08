@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
             perror("adv_pong: bind for recv socket failed\n");
             continue;
         } else {
-            printf("Receiving on port: %d\n", RECV_PORT);
+            printf("Receiving on port: %d\n", MYPORT);
         }
 
         break;
