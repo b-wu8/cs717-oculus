@@ -32,7 +32,7 @@ public class BallController : MonoBehaviour {
             StopCoroutine(rotator);
         if (pressed)
         {
-            IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.ip_address), config.port);
+            IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
             UdpClient client = new UdpClient();
             string text = "";
             byte[] data = Encoding.UTF8.GetBytes(text);
