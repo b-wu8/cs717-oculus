@@ -27,7 +27,7 @@ public struct LeftJoystick
     public Vector2 position;
 }
 
-public struct RightJoystick;
+public struct RightJoystick
 {
     public Vector2 position;
 }
