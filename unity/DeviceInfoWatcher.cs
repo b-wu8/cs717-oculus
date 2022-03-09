@@ -19,10 +19,6 @@ public class DeviceInfoWatcher : MonoBehaviour
     private InputDevice right_controller;
     private InputDevice left_controller;
     bool head_connected = false, right_connected = false, left_connected = false;
-    public 
-    Thread head_device_thread;
-    Thread left_controller_thread;
-    Thread right_controller_thread;
 
     void OnEnable()
     {
@@ -72,7 +68,7 @@ public class DeviceInfoWatcher : MonoBehaviour
         }
 
 
-        if ((device.characteristics & InputDeviceCharacteristics.Left) == InputDeviceCharacteristics.Left)
+        if ((device.characteristics & InputDeviceCharacteristics.Right) == InputDeviceCharacteristics.Right)
         {
             right_controller = device;
             right_connected = true;
@@ -162,7 +158,7 @@ public class DeviceInfoWatcher : MonoBehaviour
 
         // get headset position
         Vector3 headset_pos = new Vector3(0.0f, 0.0f, 0.0f);
-        if (right_controller.TryGetFeatureValue(CommonUsages.centerEyePosition, out headset_pos))
+        if (head_device.TryGetFeatureValue(CommonUsages.centerEyePosition, out headset_pos))
             Debug.Log("Headset pos: " + headset_pos.ToString("F2"));
 
         // get headset rotation
