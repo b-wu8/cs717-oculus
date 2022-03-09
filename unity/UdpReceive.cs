@@ -34,13 +34,16 @@ public unsafe struct RainPacket {
 };
 */
 
-public struct PlayerInfo 
+public class PlayerInfo 
 {
     public string name;
     public Headset headset;
     public LeftHandController left_hand;
     public RightHandController right_hand;
     
+    // TODO: string constructor
+
+    // data constructor
     public PlayerInfo(string name, Headset headset, LeftHandController left_hand, RightHandController right_hand)
     {
         this.name = name;
@@ -147,7 +150,10 @@ public class UdpReceive : MonoBehaviour
                 string text = Encoding.UTF8.GetString(data); // convert struct to string
 
                 string[] lines = text.Split("/n"); // TODO: better encoding
-                for (int i = 1; i < lines.Length; i++) // first line has lobby and # players
+                // 0 is lobby and # players
+                // 1 is object
+                // 2 is plane
+                for (int i = 3; i < lines.Length; i++) 
                 {
                     string[] players = text[i].Split(' ');
                     if (all_player_info.Exists(x => x.name.Equals(players[0])))

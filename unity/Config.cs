@@ -7,4 +7,6 @@ public class Config : MonoBehaviour
     public string remote_ip_address = "NOT_SPECIFIED";
     public int remote_port;
     public int local_port;
+    public string player_name;
+    public string lobby = "DEFAULT";
 }

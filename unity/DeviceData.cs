@@ -2,61 +2,113 @@
  * Declares the classes used in identifying data 
  * about a player using an Oculus device.
  */
+
 using System;
 using UnityEngine;
 
-public struct Headset : ICloneable
+/*
+ * Devices whose data is trackable.
+ * Includes the headset and controllers.
+ */
+public class TrackableDevice 
 {
-    public Vector3 postion;
+    public Vector3 position;
     public Quaternion rotation;
-    public Headset(Vector3 pos, Quaternion rot)
+
+    public TrackableDevice(Vector3 pos, Quaternion rot)
     {
-        postion = pos;
-        rotation = rot;
+        this.position.x = pos.x;
+        this.position.y = pos.y;
+        this.position.z = pos.z;
+        this.rotation.x = rot.x;
+        this.rotation.y = rot.y;
+        this.rotation.z = rot.z;
+        this.rotation.w = rot.w;
+    }
+
+    /*
+     * Serializes metadata in string format.
+     */
+    public string to_string() 
+    {
+        string data = System.String.Empty;
+        data += this.position.x + " " + 
+                this.position.y + " " + 
+                this.position.z + " ";
+        data += this.rotation.x + " " + 
+                this.rotation.y + " " + 
+                this.rotation.z + " " + 
+                this.rotation.w;
+        return data;
+    }
+
+    /*
+     * Creates a deep copy of the class.
+     */
+    public TrackableDevice deep_copy(TrackableDevice original) 
+    {
+        TrackableDevice device = new TrackableDevice(original.position, original.rotation);
     }
 }
 
-public struct LeftHandController : ICloneable
+public class Headset : TrackableDevice
 {
-    public Vector3 postion;
-    public Quaternion rotation;
-    public LeftHandController(Vector3 pos, Quaternion rot)
+    public Headset(Vector3 pos, Quaternion rot) : base(pos, rot)
     {
-        postion = pos;
-        rotation = rot;
     }
 }
 
-public struct RightHandController : ICloneable
+public class LeftHandController : TrackableDevice
 {
-    public Vector3 postion;
-    public Quaternion rotation;
-    public RightHandController(Vector3 pos, Quaternion rot)
+    public LeftHandController(Vector3 pos, Quaternion rot) : base(pos, rot)
     {
-        postion = pos;
-        rotation = rot;
     }
 }
 
-public struct LeftJoystick : ICloneable
+public class RightHandController : TrackableDevice
 {
+    public RightHandController(Vector3 pos, Quaternion rot) : base(pos, rot)
+    {
+    }
+}
+
+/* 
+ * Each of the joysticks on the device controllers.
+ */
+public class Joystick {
     public Vector2 position;
-    public LeftJoystick(Vector2 pos)
+    public Joystick(Vector2 pos)
     {
-        position = pos;
+        this.position = pos;
+    }
+
+    /*
+     * Serialize joystick movement metadata as a string.
+     */
+    public string to_string() 
+    {
+        string data = System.String.Empty;
+        data += this.position.x + " " + 
+                this.position.y;
+        return data;
     }
 }
 
-public struct RightJoystick : ICloneable
+public class LeftJoystick : Joystick
 {
-    public Vector2 position;
-    public RightJoystick(Vector2 pos)
+    public LeftJoystick(Vector2 pos) : base(pos)
     {
-        position = pos;
     }
 }
 
-public struct Timestamp : ICloneable
+public class RightJoystick : Joystick
+{
+    public RightJoystick(Vector2 pos) : base(pos)
+    {
+    }
+}
+
+public class Timestamp : ICloneable
 {
     public DateTime time;
     public Timestamp(DateTime t)
