@@ -39,7 +39,6 @@ public class UdpReceive : MonoBehaviour
     UdpClient client;
     GameObject sphere;
     public Config config;
-    public int port; // define > init
     public string lastReceivedUDPPacket = "";
     public string allReceivedUDPPackets = ""; // clean up this from time to time!
     public float x, y, z;
@@ -79,8 +78,8 @@ public class UdpReceive : MonoBehaviour
         Rect rectObj = new Rect(40, 10, 200, 400);
         GUIStyle style = new GUIStyle();
         style.alignment = TextAnchor.UpperLeft;
-        GUI.Box(rectObj, "# UDPReceive\n127.0.0.1 " + port + " #\n"
-                    + "shell> nc -u 127.0.0.1 : " + port + " \n"
+        GUI.Box(rectObj, "# UDPReceive\n127.0.0.1 " + config.local_port + " #\n"
+                    + "shell> nc -u 127.0.0.1 : " + config.local_port + " \n"
                     + "\nLast Packet: \n" + lastReceivedUDPPacket
                     + "\n\nAll Messages: \n" + allReceivedUDPPackets
                 , style);
@@ -91,11 +90,9 @@ public class UdpReceive : MonoBehaviour
     {
         Debug.Log("UDPSend.init()");
 
-        port = 8051;
-
         // status
-        Debug.Log("Sending to 127.0.0.1 : " + port);
-        Debug.Log("Test-Sending to this Port: nc -u 127.0.0.1  " + port + "");
+        Debug.Log("Sending to "+ config.remote_ip_address  +": " + config.remote_port);
+        //Debug.Log("Test-Sending to this Port: nc -u 127.0.0.1  " + port + "");
 
         // Create red sphere object
         sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -116,29 +113,29 @@ public class UdpReceive : MonoBehaviour
     private void ReceiveData()
     {
 
-        client = new UdpClient(port); // port to listen on
+        client = new UdpClient(config.local_port); // port to listen on
 
         byte[] temp = Encoding.UTF8.GetBytes("OCULUS");
-        IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.ip_address), config.port);
+        IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
         client.Send(temp, temp.Length, remoteEndPoint); // first packet to override weird 0.0.0.0 IP address packet 
         client.Send(temp, temp.Length, remoteEndPoint);
 
         while (true)
         {
             try
-            {
-                IPEndPoint anyIP = new IPEndPoint(IPAddress.Any, 0);
-                byte[] data = client.Receive(ref anyIP); // blocks until data is received from somewhere 
+            { 
+                IPEndPoint remoteIP = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
+                byte[] data = client.Receive(ref remoteIP); // blocks until data is received from somewhere 
                 string text = Encoding.UTF8.GetString(data); // convert struct to string
                 string[] pieces = text.Split(' '); // TODO: better encoding
                 Debug.Log(">> " + text);
                 lastReceivedUDPPacket = text;
                 allReceivedUDPPackets = allReceivedUDPPackets + text;
-
                 /* Update object position asynchronously via Update thread*/
                 x = float.Parse(pieces[0], CultureInfo.InvariantCulture.NumberFormat);
                 y = float.Parse(pieces[1], CultureInfo.InvariantCulture.NumberFormat);
                 z = float.Parse(pieces[2], CultureInfo.InvariantCulture.NumberFormat);
+                Debug.Log("pos rcvd:" + "X("+x+") Y("+y+") Z("+z+")");
             }
             catch (Exception err)
             {

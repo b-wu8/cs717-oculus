@@ -169,6 +169,7 @@ int main(int argc, char *argv[])
         printf("rain1 received %d byte message from %s: %s", bytes, addr_str_buff, mess);
         //parse string into position
         char** tokens = str_split(mess, ',');
+        char* timestamp;
 
         if (tokens)
         {
@@ -187,6 +188,8 @@ int main(int argc, char *argv[])
                 case 2:
                     packet.z = strtod(*(tokens + i), &pEnd);
                     break;
+                case 3:
+                    timestamp = *(tokens + i);
                 
                 default:
                     break;
