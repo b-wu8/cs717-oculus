@@ -80,6 +80,7 @@ int setup_recv_socket(int* sk, char* ip, char* port);
 int create_or_join_session(struct SessionManager* session_manager, char* mess, struct sockaddr_in* addr);
 int format_response(char* response, struct Session* session);
 int get_player_session(struct Session** session, struct SessionManager* session_manager, char* mess);
+int update_player_position(struct Session* session, char* mess);
 
 int main(int argc, char *argv[])
 {
@@ -148,6 +149,12 @@ int main(int argc, char *argv[])
             continue;
         }
 
+        if (strncmp(mess, "INPUT", 5) == 0) {
+            if (update_player_position(session, mess) != 0) {
+                continue;
+            }
+        }
+
         // Format response
         format_response(response_buff, session);
         printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
@@ -165,6 +172,55 @@ int main(int argc, char *argv[])
         session->sphere.pos.y = sin(session->sphere.t * 2 * M_PI / 16) + 3;
         session->sphere.pos.z = 4 * sin(session->sphere.t * 2 * M_PI);
     }
+}
+
+int update_player_position(struct Session* session, char* mess) {
+    char dummy_type[64];
+    char name[64];
+    char lobby[64];
+    sscanf(mess, "%s %s %s", dummy_type, name, lobby);
+
+    // Extract numbers from message
+    char number_strings[128][32];
+    memset(number_strings, 0, 32 * 128);
+    int i, j, k;
+    i = j = k = 0;
+    int num_chars = strlen(mess);
+    for (k = 0; k < num_chars; k++) {
+        if (mess[k] != ' ') {
+            number_strings[i][j++] = mess[k];
+        } else {
+            j = 0;
+            i++;
+        }
+    }
+    float numbers[125];  // ignore type, name, lobby
+    for (k = 0; k < 128 - 3; k++) {
+        numbers[k] = atof(number_strings[k + 3]);
+    }
+
+    int player_idx = -1;
+    for (k = 0; k < session->num_players; k++) {
+        if (strcmp(session->players[k].name, name) == 0) {
+            player_idx = k;
+            break;
+        }
+    }
+
+    struct Player* player = &(session->players[player_idx]);
+    player->avatar.headset.pos.x = numbers[0];
+    player->avatar.headset.pos.y = numbers[1];
+    player->avatar.headset.pos.z = numbers[2];
+    player->avatar.headset.quat.x = numbers[3];
+    player->avatar.headset.quat.y = numbers[4];
+    player->avatar.headset.quat.z = numbers[5];
+    player->avatar.headset.quat.w = numbers[6];
+
+    for (k = 0; k < 16; k++) {
+        printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
+    }
+
+    return 0;
 }
 
 int get_player_session(struct Session** session, struct SessionManager* session_manager, char* mess) {
