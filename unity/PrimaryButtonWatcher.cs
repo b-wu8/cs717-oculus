@@ -1,12 +1,3 @@
-/*
- * Scans the available devices for the primaryButton and monitors 
- * the value of the feature on any connected device. A change in 
- * the value dispatches an event.
- *
- * To use this class in Unity, add it as a component to any 
- * GameObject in the Scene.
- */
-
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;

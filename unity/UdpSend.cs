@@ -32,6 +32,8 @@ public class UdpSend : MonoBehaviour
     // prefs
     private string IP;  // define in init
     public int port;  // define in init
+    public Config config; // config for project
+
 
     // "connection" things
     IPEndPoint remoteEndPoint;
@@ -91,13 +93,11 @@ public class UdpSend : MonoBehaviour
         port = 8051;
         port = 20002;
 
-        IP = "128.220.221.21";
-        port = 4577;
 
         // ----------------------------
         // Senden
         // ----------------------------
-        remoteEndPoint = new IPEndPoint(IPAddress.Parse(IP), port);
+        remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.ip_address), config.port);
         client = new UdpClient();
 
         // status
@@ -120,7 +120,6 @@ public class UdpSend : MonoBehaviour
                 if (text != "")
                 {
 
-                    // Daten mit der UTF8-Kodierung in das Binärformat kodieren.
                     byte[] data = Encoding.UTF8.GetBytes(text);
 
                     // Den Text zum Remote-Client senden.
@@ -143,7 +142,7 @@ public class UdpSend : MonoBehaviour
             //if (message != "")
             //{
 
-            // Daten mit der UTF8-Kodierung in das Binärformat kodieren.
+            // Daten mit der UTF8-Kodierung in das Binï¿½rformat kodieren.
             byte[] data = Encoding.UTF8.GetBytes(message);
 
             // Den message zum Remote-Client senden.
