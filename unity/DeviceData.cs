@@ -26,6 +26,17 @@ public class TrackableDevice
         this.rotation.w = rot.w;
     }
 
+    public TrackableDevice()
+    {
+        this.position.x = 0;
+        this.position.y = 0;
+        this.position.z = 0;
+        this.rotation.x = 0;
+        this.rotation.y = 0;
+        this.rotation.z = 0;
+        this.rotation.w = 0;
+    }
+
     /*
      * Serializes metadata in string format.
      */
@@ -53,6 +64,7 @@ public class TrackableDevice
 
 public class Headset : TrackableDevice
 {
+    public Headset(): base() {}
     public Headset(Vector3 pos, Quaternion rot) : base(pos, rot)
     {
     }
@@ -60,13 +72,17 @@ public class Headset : TrackableDevice
 
 public class LeftHandController : TrackableDevice
 {
+    public LeftHandController(): base() {}
+
     public LeftHandController(Vector3 pos, Quaternion rot) : base(pos, rot)
     {
     }
+
 }
 
 public class RightHandController : TrackableDevice
 {
+    public RightHandController() : base() { }
     public RightHandController(Vector3 pos, Quaternion rot) : base(pos, rot)
     {
     }
@@ -77,11 +93,15 @@ public class RightHandController : TrackableDevice
  */
 public class Joystick {
     public Vector2 position;
+    public Joystick()
+    {
+        this.position.x = 0;
+        this.position.y = 0;
+    }
     public Joystick(Vector2 pos)
     {
         this.position.x = pos.x;
         this.position.y = pos.y;
-        this.position.z = pos.z;
     }
 
     /*
@@ -106,6 +126,7 @@ public class Joystick {
 
 public class LeftJoystick : Joystick
 {
+    public LeftJoystick() : base() {}
     public LeftJoystick(Vector2 pos) : base(pos)
     {
     }
@@ -113,12 +134,13 @@ public class LeftJoystick : Joystick
 
 public class RightJoystick : Joystick
 {
+    public RightJoystick() : base() {}
     public RightJoystick(Vector2 pos) : base(pos)
     {
     }
 }
 
-public class Timestamp : ICloneable
+public class Timestamp
 {
     public DateTime time;
     public Timestamp(DateTime t)

@@ -153,7 +153,7 @@ public class DeviceInfoWatcher : MonoBehaviour
         Vector2 right_joystick_vec2 = new Vector2(0.0f, 0.0f);
         if (right_controller.TryGetFeatureValue(CommonUsages.primary2DAxis, out right_joystick_vec2))
             Debug.Log("Right controller Joystick: " + right_joystick_vec2.ToString("F2"));
-        return new RightJoystick();
+        return new RightJoystick(right_joystick_vec2);
     }
     public LeftJoystick GetLeftJoystick()
     {

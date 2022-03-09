@@ -94,7 +94,7 @@ public class PrimaryButtonWatcher : MonoBehaviour
                 Debug.Log(device.name + " pos: " + device_pos.ToString("F2"));
                 if (device.name.Contains("Right"))
                 {
-                    SendPosToServer(device_pos);
+                    //SendPosToServer(device_pos);
                 } else
                 {
                     Debug.Log("Err: Did not find device");
