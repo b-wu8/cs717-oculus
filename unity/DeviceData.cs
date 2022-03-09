@@ -5,7 +5,7 @@
 using System;
 using UnityEngine;
 
-public struct Headset
+public struct Headset : ICloneable
 {
     public Vector3 postion;
     public Quaternion rotation;
@@ -16,7 +16,7 @@ public struct Headset
     }
 }
 
-public struct LeftHandController
+public struct LeftHandController : ICloneable
 {
     public Vector3 postion;
     public Quaternion rotation;
@@ -27,7 +27,7 @@ public struct LeftHandController
     }
 }
 
-public struct RightHandController
+public struct RightHandController : ICloneable
 {
     public Vector3 postion;
     public Quaternion rotation;
@@ -38,7 +38,7 @@ public struct RightHandController
     }
 }
 
-public struct LeftJoystick
+public struct LeftJoystick : ICloneable
 {
     public Vector2 position;
     public LeftJoystick(Vector2 pos)
@@ -47,7 +47,7 @@ public struct LeftJoystick
     }
 }
 
-public struct RightJoystick
+public struct RightJoystick : ICloneable
 {
     public Vector2 position;
     public RightJoystick(Vector2 pos)
@@ -56,7 +56,7 @@ public struct RightJoystick
     }
 }
 
-public struct Timestamp
+public struct Timestamp : ICloneable
 {
     public DateTime time;
     public Timestamp(DateTime t)
