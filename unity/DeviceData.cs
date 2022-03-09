@@ -45,9 +45,9 @@ public class TrackableDevice
     /*
      * Creates a deep copy of the class.
      */
-    public TrackableDevice deep_copy(TrackableDevice original) 
+    public TrackableDevice deep_copy(TrackableDevice device) 
     {
-        TrackableDevice device = new TrackableDevice(original.position, original.rotation);
+        return new TrackableDevice(device.position, device.rotation);
     }
 }
 
@@ -79,7 +79,9 @@ public class Joystick {
     public Vector2 position;
     public Joystick(Vector2 pos)
     {
-        this.position = pos;
+        this.position.x = pos.x;
+        this.position.y = pos.y;
+        this.position.z = pos.z;
     }
 
     /*
@@ -91,6 +93,14 @@ public class Joystick {
         data += this.position.x + " " + 
                 this.position.y;
         return data;
+    }
+
+    /*
+     * Creates a deep copy of the class.
+     */
+    public Joystick deep_copy(Joystick device) 
+    {
+        return new Joystick(device.position);
     }
 }
 
