@@ -40,16 +40,38 @@ public class PlayerInfo
     public Headset headset;
     public LeftHandController left_hand;
     public RightHandController right_hand;
+    public string timestamp;
     
-    // TODO: string constructor
-
-    // data constructor
+    //string constructor
     public PlayerInfo(string name, Headset headset, LeftHandController left_hand, RightHandController right_hand)
     {
         this.name = name;
-        this.headset = headset;
-        this.left_hand = (LeftHandController) left_hand.Clone();
-        this.right_hand = (RightHandController) right_hand.Clone();
+        this.headset = Headset.deep_copy(headset);
+        this.left_hand = LeftHandController.deep_copy(left_hand);
+        this.right_hand = RightHandController.deep_copy(right_hand);
+    }
+
+    vector3 StringToVec3(string str_x, string str_y, string str_z){
+        return new vector3(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z));
+    }
+
+    vector2 StringToVec2(string str_x, string str_y){
+        return new vector2(float.Parse(str_x), float.Parse(str_y));
+    }
+
+    Quaternion StringToQuat(string str_x, string str_y, string str_z, string str_w){
+        return new Quaternion(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z), float.Parse(str_w));
+    }
+
+    public PlayerInfo(string data)
+    {
+        string[] infos = data.Split(' ');
+        this.name = infos[0];
+        this.headset = new headset(StringToVec3(infos[1], infos[2], infos[3]), StringToQuat(info[4], info[5], info[6], info[7]));
+        this.left_hand = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(info[11], info[12], info[13], info[14]));
+        this.right_hand = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(info[18], info[19], info[20], info[21]));
+        this.timestamp = infos[22];
+        
     }
 }
 
