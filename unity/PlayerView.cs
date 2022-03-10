@@ -5,6 +5,7 @@ public class PlayerView : MonoBehaviour
 {
     public Dictionary<string, PlayerInfo> player_infos; // players
     public Vector3 sphere_loc, plane_loc;
+    public int num_players = 0;
 
     private Dictionary<string, GameObject> player_heads;
     private Dictionary<string, GameObject> player_lefthands;
@@ -49,11 +50,14 @@ public class PlayerView : MonoBehaviour
         foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in player_infos)
         {
             string player_name = name_2_player_info.Key;
+
             PlayerInfo player_info = name_2_player_info.Value;
 
+            Debug.Log("Player info: " + player_info.to_string());
             // old player
             if (player_heads.ContainsKey(player_name) )
             {
+
                 // update head position and rotation
                 player_heads[player_name].transform.position = player_info.headset.position;
                 player_heads[player_name].transform.rotation = player_info.headset.rotation;
