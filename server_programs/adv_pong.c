@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
         }
 
         // Check if this is oculus server
-        if (strcmp(mess[0], SYN) == 0) {  // FIXME
+        if (strncmp(mess, SYN, 1) == 0) {  // FIXME
             if (create_or_join_session(&session_manager, mess, &remote_addr) != 0) {
                 continue;  // We should send back an error response later
             }
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        if (strcmp(mess[0], INPUT) == 0) {
+        if (strncmp(mess, INPUT, 1) == 0) {
             if (update_player_position(session, mess) != 0) {
                 continue;
             }
