@@ -21,6 +21,45 @@ static class Constants
     // player formally quits
     public const int FIN = 3;
 }
+public class PlayerInfo 
+{
+    public string name;
+    public Headset headset;
+    public LeftHandController left_hand;
+    public RightHandController right_hand;
+    public string timestamp;
+    
+    //string constructor
+    public PlayerInfo(string name, Headset headset, LeftHandController left_hand, RightHandController right_hand)
+    {
+        this.name = name;
+        this.headset = (Headset) Headset.deep_copy(headset);
+        this.left_hand = (LeftHandController) LeftHandController.deep_copy(left_hand);
+        this.right_hand = (RightHandController) RightHandController.deep_copy(right_hand);
+    }
+
+    Vector3 StringToVec3(string str_x, string str_y, string str_z){
+        return new Vector3(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z));
+    }
+
+    Vector2 StringToVec2(string str_x, string str_y){
+        return new Vector2(float.Parse(str_x), float.Parse(str_y));
+    }
+
+    Quaternion StringToQuat(string str_x, string str_y, string str_z, string str_w){
+        return new Quaternion(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z), float.Parse(str_w));
+    }
+
+    public PlayerInfo(string data)
+    {
+        string[] infos = data.Split(' ');
+        this.name = infos[0];
+        this.headset = new Headset(StringToVec3(infos[1], infos[2], infos[3]), StringToQuat(infos[4], infos[5], infos[6], infos[7]));
+        this.left_hand = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(infos[11], infos[12], infos[13], infos[14]));
+        this.right_hand = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(infos[18], infos[19], infos[20], infos[21]));
+        this.timestamp = infos[22];
+    }
+}
 
 /*
  * Devices whose data is trackable.
