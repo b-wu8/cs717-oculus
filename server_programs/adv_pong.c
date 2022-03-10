@@ -334,7 +334,7 @@ int create_or_join_session(struct SessionManager* session_manager, char* mess, s
             memcpy(&session->players[session->num_players].addr, addr, sizeof(struct sockaddr_in));
             strcpy(session->players[session->num_players].name, name);
             session->num_players++;
-            // printf("Player \"%s\" joined lobby \"%s\" (%d/%d)\n", name, lobby, session->num_players, MAX_NUM_PLAYERS);
+            printf("Player \"%s\" joined lobby \"%s\" (%d/%d)\n", name, lobby, session->num_players, MAX_NUM_PLAYERS);
             return 0;
         }
     }
