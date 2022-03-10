@@ -221,6 +221,22 @@ int update_player_position(struct Session* session, char* mess) {
     player->avatar.headset.quat.z = numbers[5];
     player->avatar.headset.quat.w = numbers[6];
 
+    player->avatar.left_hand.pos.x = numbers[7];
+    player->avatar.left_hand.pos.y = numbers[8];
+    player->avatar.left_hand.pos.z = numbers[9];
+    player->avatar.left_hand.quat.x = numbers[10];
+    player->avatar.left_hand.quat.y = numbers[11];
+    player->avatar.left_hand.quat.z = numbers[12];
+    player->avatar.left_hand.quat.w = numbers[13];
+
+    player->avatar.right_hand.pos.x = numbers[14];
+    player->avatar.right_hand.pos.y = numbers[15];
+    player->avatar.right_hand.pos.z = numbers[16];
+    player->avatar.right_hand.quat.x = numbers[17];
+    player->avatar.right_hand.quat.y = numbers[18];
+    player->avatar.right_hand.quat.z = numbers[19];
+    player->avatar.right_hand.quat.w = numbers[20];
+    
     for (k = 0; k < 16; k++) {
         printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
     }
