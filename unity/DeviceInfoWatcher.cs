@@ -10,7 +10,6 @@ using System.Threading;
 [System.Serializable]
 public class DeviceInfoWatcher : MonoBehaviour
 {
-    public Config config;
     // input devices
     private InputDevice head_device;
     private InputDevice right_controller;

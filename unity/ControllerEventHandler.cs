@@ -19,8 +19,8 @@ public class ControllerEventHandler : MonoBehaviour
 {
     public Config config; // must map in Unity Engine
     public DeviceInfoWatcher device_watcher;
-    private Thread sendThread;
-
+    private Thread sendThread; // TODO: stop the thread if game ix killed
+    private int thread_sleep_time = 16;
 
     // remote_ip_address, remote_port = server IP address, server port
     IPEndPoint remoteEndPoint;
@@ -88,12 +88,12 @@ public class ControllerEventHandler : MonoBehaviour
                 else
                     Debug.Log("Err: Sending failure.");
 
-                System.Threading.Thread.Sleep(1000);
+                System.Threading.Thread.Sleep(thread_sleep_time);
 
             }
-            catch (Exception err)
+            catch (Exception e)
             {
-                Debug.Log(err.ToString());
+                Debug.Log("Exception: " + e.Message);
             }
         }
     }
