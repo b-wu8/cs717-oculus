@@ -20,6 +20,9 @@
 #define MAX_NUM_PLAYERS 16
 #define MAX_NUM_SESSIONS 16
 #define RESPONSE_SIZE 2048
+#define SYN 1 // first message from client
+#define INPUT 2 // client update message
+#define FIN 3 // client's explicite exit message
 
 struct Position {
     float x;
@@ -139,7 +142,7 @@ int main(int argc, char *argv[])
         }
 
         // Check if this is oculus server
-        if (strncmp(mess, "OCULUS", 6) == 0) {  // FIXME
+        if (atoi(mess[0]) == SYN) {  // FIXME
             if (create_or_join_session(&session_manager, mess, &remote_addr) != 0) {
                 continue;  // We should send back an error response later
             }
@@ -149,11 +152,13 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        if (strncmp(mess, "INPUT", 5) == 0) {
+        if (atoi(mess[0]) == INPUT) {
             if (update_player_position(session, mess) != 0) {
                 continue;
             }
         }
+
+        // todo: player exit :if (atoi(mess[0]) == FIN) 
 
         // Format response
         format_response(response_buff, session);
