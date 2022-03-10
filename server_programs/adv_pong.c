@@ -239,7 +239,7 @@ int update_player_position(struct Session* session, char* mess) {
     player->avatar.right_hand.quat.z = numbers[19];
     player->avatar.right_hand.quat.w = numbers[20];
 
-    player->timestamp = number_strings[21 + offset];
+    player->timestamp = number_strings[25 + offset];
     
     for (k = 0; k < 16; k++) {
         printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
@@ -302,7 +302,7 @@ int format_response(char* response, struct Session* session) {
         
         ptr = &(response[strlen(response)]);  
         pose = &(player->avatar.right_hand);
-        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %s \n", pose->pos.x, pose->pos.y, pose->pos.z, pose->quat.x, pose->quat.y, pose->quat.z, pose->quat.w, player->timestamp);
+        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %s\n", pose->pos.x, pose->pos.y, pose->pos.z, pose->quat.x, pose->quat.y, pose->quat.z, pose->quat.w, player->timestamp);
     }
     response[strlen(response) - 1] = '\0';  // remove last newline
     return 0;

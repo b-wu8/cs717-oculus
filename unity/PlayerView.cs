@@ -50,9 +50,9 @@ public class PlayerView : MonoBehaviour
 
     private void LogLatency()
     {
-        if (player_infos.ContainsKey(config.name))
+        if (player_infos.ContainsKey(config.player_name))
         {
-            long old_timestamp = Int64.Parse(player_infos[config.name].timestamp);
+            long old_timestamp = Int64.Parse(player_infos[config.player_name].timestamp);
             long current_timestamp = Int64.Parse(GetTimeStamp(DateTime.Now));
             Debug.Log("received timestamp: " + old_timestamp);
             Debug.Log("Latency in ms: " + (((double)(current_timestamp - old_timestamp)) / ((double)10)));
@@ -65,7 +65,7 @@ public class PlayerView : MonoBehaviour
         sphere.transform.position = sphere_loc;
         plane.transform.position = plane_loc;
 
-        Debug.Log("Current player name : " + config.name);
+        Debug.Log("Current player name : " + config.player_name);
         Debug.Log("Player number :" + player_infos.Count);
         Debug.Log("Player sphere position: " + sphere_loc.ToString());
         LogLatency();
