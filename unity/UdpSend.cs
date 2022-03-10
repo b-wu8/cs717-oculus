@@ -30,8 +30,6 @@ public class UdpSend : MonoBehaviour
     private static int localPort;
 
     // prefs
-    private string IP;  // define in init
-    public int port;  // define in init
     public Config config; // config for project
 
 
@@ -67,8 +65,8 @@ public class UdpSend : MonoBehaviour
         Rect rectObj = new Rect(40, 380, 200, 400);
         GUIStyle style = new GUIStyle();
         style.alignment = TextAnchor.UpperLeft;
-        GUI.Box(rectObj, "# UDPSend-Data\n" + IP + " " + port + " #\n"
-                    + "shell> nc -lu " + IP + " " + port + " \n"
+        GUI.Box(rectObj, "# UDPSend-Data\n" + config.remote_ip_address + " " + config.localPort + " #\n"
+                    + "shell> nc -lu " + config.remote_ip_address + " " + config.localPort + " \n"
                 , style);
 
         // ------------------------
@@ -88,22 +86,11 @@ public class UdpSend : MonoBehaviour
         // Endpunkt definieren, von dem die Nachrichten gesendet werden.
         Debug.Log("UDPSend.init()");
 
-        // define
-        IP = "127.0.0.1";
-        port = 8051;
-        port = 20002;
-
-
         // ----------------------------
         // Senden
         // ----------------------------
         remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.ip_address), config.port);
         client = new UdpClient();
-
-        // status
-        Debug.Log("Sending to " + IP + " : " + port);
-        Debug.Log("Testing: nc -lu " + IP + " : " + port);
-
     }
 
     // inputFromConsole
