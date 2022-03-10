@@ -11,6 +11,7 @@ using UnityEngine.Events;
 public class BallController : MonoBehaviour {
 
     public PrimaryButtonWatcher watcher;
+    public Config config;
     public bool IsPressed = false; // used to display button state in the Unity Inspector window
     public Vector3 rotationAngle = new Vector3(45, 45, 45);
     public float rotationDuration = 0.25f; // seconds

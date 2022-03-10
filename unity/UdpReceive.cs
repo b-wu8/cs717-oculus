@@ -14,6 +14,7 @@
  
 */
 using UnityEngine;
+using Unity;
 using System.Collections;
 using System;
 using System.Text;
@@ -22,6 +23,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Runtime.InteropServices;
 using System.Globalization;
+using System.Collections.Generic;
 
 /*
 [StructLayout(LayoutKind.Sequential, Pack=1)]
@@ -46,17 +48,17 @@ public class PlayerInfo
     public PlayerInfo(string name, Headset headset, LeftHandController left_hand, RightHandController right_hand)
     {
         this.name = name;
-        this.headset = Headset.deep_copy(headset);
-        this.left_hand = LeftHandController.deep_copy(left_hand);
-        this.right_hand = RightHandController.deep_copy(right_hand);
+        this.headset = (Headset) Headset.deep_copy(headset);
+        this.left_hand = (LeftHandController) LeftHandController.deep_copy(left_hand);
+        this.right_hand = (RightHandController) RightHandController.deep_copy(right_hand);
     }
 
-    vector3 StringToVec3(string str_x, string str_y, string str_z){
-        return new vector3(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z));
+    Vector3 StringToVec3(string str_x, string str_y, string str_z){
+        return new Vector3(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z));
     }
 
-    vector2 StringToVec2(string str_x, string str_y){
-        return new vector2(float.Parse(str_x), float.Parse(str_y));
+    Vector2 StringToVec2(string str_x, string str_y){
+        return new Vector2(float.Parse(str_x), float.Parse(str_y));
     }
 
     Quaternion StringToQuat(string str_x, string str_y, string str_z, string str_w){
@@ -67,9 +69,9 @@ public class PlayerInfo
     {
         string[] infos = data.Split(' ');
         this.name = infos[0];
-        this.headset = new headset(StringToVec3(infos[1], infos[2], infos[3]), StringToQuat(info[4], info[5], info[6], info[7]));
-        this.left_hand = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(info[11], info[12], info[13], info[14]));
-        this.right_hand = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(info[18], info[19], info[20], info[21]));
+        this.headset = new Headset(StringToVec3(infos[1], infos[2], infos[3]), StringToQuat(infos[4], infos[5], infos[6], infos[7]));
+        this.left_hand = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(infos[11], infos[12], infos[13], infos[14]));
+        this.right_hand = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(infos[18], infos[19], infos[20], infos[21]));
         this.timestamp = infos[22];
         
     }
@@ -83,7 +85,7 @@ public class UdpReceive : MonoBehaviour
     public Config config;
     public string lastReceivedUDPPacket = "";
     public string allReceivedUDPPackets = ""; // clean up this from time to time!
-    // public float x, y, z;
+    public float x, y, z;
     List<PlayerInfo> all_player_info = new List<PlayerInfo>();
 
     // start from shell
@@ -171,20 +173,20 @@ public class UdpReceive : MonoBehaviour
                 byte[] data = client.Receive(ref remoteIP); // blocks until data is received from somewhere 
                 string text = Encoding.UTF8.GetString(data); // convert struct to string
 
-                string[] lines = text.Split("/n"); // TODO: better encoding
+                string[] lines = text.Split('\n'); // TODO: better encoding
                 // 0 is lobby and # players
                 // 1 is object
                 // 2 is plane
                 for (int i = 3; i < lines.Length; i++) 
                 {
-                    string[] players = text[i].Split(' ');
-                    if (all_player_info.Exists(x => x.name.Equals(players[0])))
+                    string[] players = lines[i].Split(' ');
+                    if (all_player_info.Exists(x => x.name.Equals(players[i])))
                     {
                         continue; // player already added
                     } 
                     else
                     {
-                        PlayerInfo new_player = new PlayerInfo(players[0], players[1], players[2], players[3]);
+                        PlayerInfo new_player = new PlayerInfo(players[i]);
                     }
                 } 
 

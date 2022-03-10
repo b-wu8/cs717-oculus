@@ -65,8 +65,8 @@ public class UdpSend : MonoBehaviour
         Rect rectObj = new Rect(40, 380, 200, 400);
         GUIStyle style = new GUIStyle();
         style.alignment = TextAnchor.UpperLeft;
-        GUI.Box(rectObj, "# UDPSend-Data\n" + config.remote_ip_address + " " + config.localPort + " #\n"
-                    + "shell> nc -lu " + config.remote_ip_address + " " + config.localPort + " \n"
+        GUI.Box(rectObj, "# UDPSend-Data\n" + config.remote_ip_address + " " + config.local_port + " #\n"
+                    + "shell> nc -lu " + config.remote_ip_address + " " + config.local_port + " \n"
                 , style);
 
         // ------------------------
@@ -89,7 +89,7 @@ public class UdpSend : MonoBehaviour
         // ----------------------------
         // Senden
         // ----------------------------
-        remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.ip_address), config.port);
+        remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
         client = new UdpClient();
     }
 
