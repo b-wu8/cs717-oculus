@@ -64,7 +64,6 @@ public class ControllerEventHandler : MonoBehaviour
      */
     private void SendData()
     {
-
         while (true)
         {
             try

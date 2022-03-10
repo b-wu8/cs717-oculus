@@ -31,6 +31,9 @@ public class ServerEventHandler : MonoBehaviour
 
     private GameObject sphere, plane;
     private Player player;
+    // public List<PlayerInfo> all_player_info = new List<PlayerInfo>();
+    public PlayerView pv;
+    // public Dictionary<string, PlayerInfo> all_players = new Dictionary<string, PlayerInfo>();
     private string last_packet;
     public UdpClient client;
     private Vector3 sphere_loc, plane_loc, xr_loc;
@@ -40,7 +43,7 @@ public class ServerEventHandler : MonoBehaviour
     public void Start()
     {
         client = new UdpClient();
-        byte[] temp = Encoding.UTF8.GetBytes("OCULUS " + config.player_name + " " + config.lobby);
+        byte[] temp = Encoding.UTF8.GetBytes(Constants.SYN + " " + config.player_name + " " + config.lobby);
         IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
         client.Send(temp, temp.Length, remoteEndPoint);
         client.Send(temp, temp.Length, remoteEndPoint);
@@ -77,8 +80,7 @@ public class ServerEventHandler : MonoBehaviour
         var left_renderer = player.left.GetComponent<Renderer>();
         left_renderer.material.SetColor("_Color", Color.cyan);
 
-        receive_thread = new Thread(
-            new ThreadStart(ReceiveData));
+        receive_thread = new Thread(new ThreadStart(ReceiveData));
         receive_thread.IsBackground = true;
         receive_thread.Start();
     }
@@ -108,11 +110,10 @@ public class ServerEventHandler : MonoBehaviour
     }
 
     // receive thread
-    private void ReceiveData()
+    private async void ReceiveData()
     {
         while (true)
         {
-            // Bytes empfangen.
             IPEndPoint from_addr = new IPEndPoint(IPAddress.Any, 0);
             byte[] data = client.Receive(ref from_addr);
             string text = Encoding.UTF8.GetString(data);
@@ -120,31 +121,51 @@ public class ServerEventHandler : MonoBehaviour
 
             string[] lines = text.Split('\n');
 
-            string[] sphere_pieces = lines[1].Split(' ');
-            x = float.Parse(sphere_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
-            y = float.Parse(sphere_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
-            z = float.Parse(sphere_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
-            sphere_loc = new Vector3(x, y, z);
-            //player.head_loc = new Vector3(x + 2f, y + 2f, z + 2f);
-            player.left_loc = new Vector3(x + 1.5f, y + 1.5f, z);
-            player.right_loc = new Vector3(x + 2.5f, y + 1.5f, z);
+            if (int.Parse(lines[0]) == Constants.SYN) 
+            {
+                // new player entered
+            } 
+            else // INPUT packet
+            {
+                string[] sphere_pieces = lines[1].Split(' ');
+                x = float.Parse(sphere_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
+                y = float.Parse(sphere_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
+                z = float.Parse(sphere_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
+                sphere_loc = new Vector3(x, y, z);
+                //player.head_loc = new Vector3(x + 2f, y + 2f, z + 2f);
+                player.left_loc = new Vector3(x + 1.5f, y + 1.5f, z);
+                player.right_loc = new Vector3(x + 2.5f, y + 1.5f, z);
 
-            string[] plane_pieces = lines[2].Split(' ');
-            x = float.Parse(plane_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
-            y = float.Parse(plane_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
-            z = float.Parse(plane_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
-            plane_loc = new Vector3(x, y, z);
+                string[] plane_pieces = lines[2].Split(' ');
+                x = float.Parse(plane_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
+                y = float.Parse(plane_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
+                z = float.Parse(plane_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
+                plane_loc = new Vector3(x, y, z);
 
-            string[] head_pieces = lines[3].Split(' ');
-            x = float.Parse(head_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
-            y = float.Parse(head_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
-            z = float.Parse(head_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
-            qx = float.Parse(head_pieces[4], CultureInfo.InvariantCulture.NumberFormat);
-            qy = float.Parse(head_pieces[5], CultureInfo.InvariantCulture.NumberFormat);
-            qz = float.Parse(head_pieces[6], CultureInfo.InvariantCulture.NumberFormat);
-            qw = float.Parse(head_pieces[7], CultureInfo.InvariantCulture.NumberFormat);
-            player.head_loc = new Vector3(x, y, z);
-            player.head_quat = new Quaternion(qx, qy, qz, qw);
+                for (int i = 3; i < lines.Length; i++) 
+                {
+                    string[] players = lines[i].Split(' ');
+                    try 
+                    {
+                        PlayerInfo curr_player = pv.player_infos[(string) players[i][0]];
+                        string[] head_pieces = lines[i].Split(' ');
+                        x = float.Parse(head_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
+                        y = float.Parse(head_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
+                        z = float.Parse(head_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
+                        qx = float.Parse(head_pieces[4], CultureInfo.InvariantCulture.NumberFormat);
+                        qy = float.Parse(head_pieces[5], CultureInfo.InvariantCulture.NumberFormat);
+                        qz = float.Parse(head_pieces[6], CultureInfo.InvariantCulture.NumberFormat);
+                        qw = float.Parse(head_pieces[7], CultureInfo.InvariantCulture.NumberFormat);
+                        curr_player.headset = new Headset(new Vector3(x, y, z), new Quaternion(qx, qy, qz, qw));
+
+                        // TODO: LH RH   
+                    }
+                    catch (KeyNotFoundException)
+                    { 
+                        all_players.add(players[i][0], new PlayerInfo(players[i])); // add new player
+                    }
+                } 
+            }
         }
     }
 }
