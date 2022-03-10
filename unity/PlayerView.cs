@@ -6,6 +6,7 @@ public class PlayerView : MonoBehaviour
 {
     public Dictionary<string, PlayerInfo> player_infos = new Dictionary<string, PlayerInfo>(); // players
     public Vector3 sphere_loc, plane_loc;
+    public Config config;
     public int num_players = 0;
 
     private Dictionary<string, GameObject> player_heads = new Dictionary<string, GameObject>();
@@ -42,14 +43,32 @@ public class PlayerView : MonoBehaviour
         colors.Add(6, Color.red);
     }
 
+    private string GetTimeStamp(DateTime time)
+    {
+        return time.ToString("yyyyMMddHHmmssffff");
+    }
+
+    private void LogLatency()
+    {
+        if (player_infos.ContainsKey(config.name))
+        {
+            long old_timestamp = Int64.Parse(player_infos[config.name].timestamp);
+            long current_timestamp = Int64.Parse(GetTimeStamp(DateTime.Now));
+            Debug.Log("received timestamp: " + old_timestamp);
+            Debug.Log("Latency in ms: " + (((double)(current_timestamp - old_timestamp)) / ((double)10)));
+        }
+    }
+
     // Update is called once per frame
     public void Update()
     {
         sphere.transform.position = sphere_loc;
         plane.transform.position = plane_loc;
 
+        Debug.Log("Current player name : " + config.name);
         Debug.Log("Player number :" + player_infos.Count);
         Debug.Log("Player sphere position: " + sphere_loc.ToString());
+        LogLatency();
 
         foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in player_infos)
         {

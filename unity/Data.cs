@@ -58,7 +58,7 @@ public class PlayerInfo
         this.left_hand = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(infos[11], infos[12], infos[13], infos[14]));
         this.right_hand = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(infos[18], infos[19], infos[20], infos[21]));
         Debug.Log("New player data: " + this.to_string());
-        //this.timestamp = infos[22];
+        this.timestamp = infos[22];
     }
 
     public string to_string()

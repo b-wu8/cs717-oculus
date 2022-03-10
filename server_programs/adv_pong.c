@@ -61,6 +61,7 @@ struct Player {
     char name[64];
     struct Avatar avatar;
     struct sockaddr_in addr;
+    char* timestamp;
 };
 
 struct Session {
@@ -183,6 +184,7 @@ int update_player_position(struct Session* session, char* mess) {
     char dummy_type[64];
     char name[64];
     char lobby[64];
+    int offset = 3;
     sscanf(mess, "%s %s %s", dummy_type, name, lobby);
 
     // Extract numbers from message
@@ -200,8 +202,8 @@ int update_player_position(struct Session* session, char* mess) {
         }
     }
     float numbers[125];  // ignore type, name, lobby
-    for (k = 0; k < 128 - 3; k++) {
-        numbers[k] = atof(number_strings[k + 3]);
+    for (k = 0; k < 128 - offset; k++) {
+        numbers[k] = atof(number_strings[k + offset]);
     }
 
     int player_idx = -1;
@@ -236,6 +238,8 @@ int update_player_position(struct Session* session, char* mess) {
     player->avatar.right_hand.quat.y = numbers[18];
     player->avatar.right_hand.quat.z = numbers[19];
     player->avatar.right_hand.quat.w = numbers[20];
+
+    player->timestamp = number_strings[21 + offset];
     
     for (k = 0; k < 16; k++) {
         printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
@@ -298,7 +302,7 @@ int format_response(char* response, struct Session* session) {
         
         ptr = &(response[strlen(response)]);  
         pose = &(player->avatar.right_hand);
-        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f\n", pose->pos.x, pose->pos.y, pose->pos.z, pose->quat.x, pose->quat.y, pose->quat.z, pose->quat.w);
+        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %s \n", pose->pos.x, pose->pos.y, pose->pos.z, pose->quat.x, pose->quat.y, pose->quat.z, pose->quat.w, player->timestamp);
     }
     response[strlen(response) - 1] = '\0';  // remove last newline
     return 0;
