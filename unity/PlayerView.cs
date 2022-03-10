@@ -16,8 +16,11 @@ public class PlayerView : MonoBehaviour
     private GameObject sphere, plane;
     private Dictionary<int, Color> colors = new Dictionary<int, Color>();
     private int player_idx = 0;
+    private double max_latency = long.MinValue;
+    private double latency_sum = 0;
+    private int latency_count = 0;
 
-    // Start is called before the first frame update
+// Start is called before the first frame update
     void Start()
     {
         // init game objects
@@ -50,12 +53,22 @@ public class PlayerView : MonoBehaviour
 
     private void LogLatency()
     {
+
         if (player_infos.ContainsKey(config.player_name))
         {
             long old_timestamp = Int64.Parse(player_infos[config.player_name].timestamp);
             long current_timestamp = Int64.Parse(GetTimeStamp(DateTime.Now));
             Debug.Log("received timestamp: " + old_timestamp);
-            Debug.Log("Latency in ms: " + (((double)(current_timestamp - old_timestamp)) / ((double)10)));
+            double latency = (((double)(current_timestamp - old_timestamp)) / ((double)10));
+            latency_sum += latency;
+            latency_count += 1;
+            Debug.Log("Latency in ms: " + latency);
+            if(latency > max_latency)
+            {
+                max_latency = latency;
+                Debug.Log("Max latency in ms: " + latency);
+            }
+            Debug.Log("Average latency in ms: " + (latency_sum/(double) latency_count));
         }
     }
 
