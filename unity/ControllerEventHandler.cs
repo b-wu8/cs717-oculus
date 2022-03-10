@@ -13,19 +13,6 @@ using System.Runtime.InteropServices;
 using System.Globalization;
 
 /*
- * Types to classify what kind of message is being sent.
- */
-static class Constants
-{
-    // startup message indicates that a player is trying to connect to room
-    // the player name is mapped to the included IP address
-    public const string OCULUS = "OCULUS";  
-
-    // controller input message
-    public const string INPUT = "INPUT";    
-}
-
-/*
  * Event handler for Oculus.
  */
 public class ControllerEventHandler : MonoBehaviour
@@ -45,12 +32,12 @@ public class ControllerEventHandler : MonoBehaviour
     public void Start()
     {
         init();
-        byte[] first_data = Encoding.UTF8.GetBytes("OCULUS " + config.player_name + " " + config.lobby);
+        byte[] first_data = Encoding.UTF8.GetBytes(Constants.SYN + " " + config.player_name + " " + config.lobby);
         UdpClient client = new UdpClient();
         int sent_bytes = client.Send(first_data, first_data.Length, remoteEndPoint);
         sent_bytes = client.Send(first_data, first_data.Length, remoteEndPoint); //TODO: 0.0.0.0:0
         if (sent_bytes == first_data.Length)
-            Debug.Log("Sent to " + config.remote_ip_address + ":" + "OCULUS " + config.player_name + " " + config.lobby);
+            Debug.Log("Sent to " + config.remote_ip_address + ":" + Constants.SYN + " " + config.player_name + " " + config.lobby);
         else
             Debug.Log("Err: Sending failure.");
     }

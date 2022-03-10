@@ -7,6 +7,22 @@ using System;
 using UnityEngine;
 
 /*
+ * Types to classify what kind of message is being sent.
+ */
+static class Constants
+{
+    // startup message indicates that a player is trying to connect to room
+    // the player name is mapped to the included IP address
+    public const int SYN = 1;
+
+    // controller input message
+    public const int INPUT = 2;
+    
+    // player formally quits
+    public const int FIN = 3;
+}
+
+/*
  * Devices whose data is trackable.
  * Includes the headset and controllers.
  */
