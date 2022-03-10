@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
 
         // Display that we have received message
         format_addr(addr_str_buff, &remote_addr);
-        printf("rain1 received %d byte message from %s: %s", bytes, addr_str_buff, mess);
+        // printf("rain1 received %d byte message from %s: %s", bytes, addr_str_buff, mess);
         if (bytes && mess[bytes - 1] != '\n') {
             printf("\n");
         }
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
 
         // Format response
         format_response(response_buff, session);
-        printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
+        // printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
         for (i = 0; i < session->num_players; i++) {
             addr = &(session->players[i].addr);
             sendto(sk, response_buff, strlen(response_buff) + 1, 0, (struct sockaddr*)addr, sizeof(struct sockaddr_in));
@@ -241,9 +241,9 @@ int update_player_position(struct Session* session, char* mess) {
 
     player->timestamp = number_strings[25 + offset];
     
-    for (k = 0; k < 16; k++) {
-        printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
-    }
+    // for (k = 0; k < 16; k++) {
+    //     printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
+    // }
 
     return 0;
 }
