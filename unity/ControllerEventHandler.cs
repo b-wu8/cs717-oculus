@@ -3,14 +3,11 @@
  */
 
 using UnityEngine;
-using System.Collections;
 using System;
 using System.Text;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using System.Runtime.InteropServices;
-using System.Globalization;
 
 /*
  * Event handler for Oculus.
@@ -95,12 +92,12 @@ public class ControllerEventHandler : MonoBehaviour
                 else
                     Debug.Log("Err: Sending failure.");
 
-                System.Threading.Thread.Sleep(config.send_thread_sleep_time);
             }
             catch (Exception e)
             {
                 Debug.Log("Exception: " + e.Message);
             }
+            System.Threading.Thread.Sleep(config.send_thread_sleep_time);
         }
     }
 }

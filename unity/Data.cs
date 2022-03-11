@@ -51,15 +51,15 @@ public class PlayerInfo
         //TODO: add joysticks
     }
 
-    Vector3 StringToVec3(string str_x, string str_y, string str_z){
+    public static Vector3 StringToVec3(string str_x, string str_y, string str_z){
         return new Vector3(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z));
     }
 
-    Vector2 StringToVec2(string str_x, string str_y){
+    public static Vector2 StringToVec2(string str_x, string str_y){
         return new Vector2(float.Parse(str_x), float.Parse(str_y));
     }
 
-    Quaternion StringToQuat(string str_x, string str_y, string str_z, string str_w){
+    public static Quaternion StringToQuat(string str_x, string str_y, string str_z, string str_w){
         return new Quaternion(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z), float.Parse(str_w));
     }
 

@@ -15,37 +15,14 @@ using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine.UI;
 
-struct Player
-{
-    public string name;
-    public string lobby;
-    public GameObject head;
-    public Vector3 head_loc;
-    public Quaternion head_quat;
-    public GameObject right;
-    public Vector3 right_loc;
-    public Quaternion right_quat;
-    public GameObject left;
-    public Vector3 left_loc;
-    public Quaternion left_quat;
-}
-
 public class ServerEventHandler : MonoBehaviour
 {
-    public Transform xr_transform;
     public Config config;
     public PlayerView pv;
     private string last_packet;
     public UdpClient client;
-    private Vector3 xr_loc;
-    private float x, y, z, qx, qy, qz, qw;
     private Thread receive_thread;
     private volatile bool thread_run = false;
-
-    // todo: delete the debug variable
-    public Text debug_display;
-    public int num_of_players = 0;
-    public string debug_playerinfo;
 
     public void Start()
     {
@@ -99,20 +76,13 @@ public class ServerEventHandler : MonoBehaviour
 
             string[] msg = lines[0].Split(' ');
             pv.num_players = int.Parse(msg[1]);
-            num_of_players = pv.num_players;
 
             string[] sphere_pieces = lines[1].Split(' ');
-            x = float.Parse(sphere_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
-            y = float.Parse(sphere_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
-            z = float.Parse(sphere_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
-            pv.sphere_loc = new Vector3(x, y, z);
+            pv.sphere_loc = PlayerInfo.StringToVec3(sphere_pieces[1], sphere_pieces[2], sphere_pieces[3]);
             
 
             string[] plane_pieces = lines[2].Split(' ');
-            x = float.Parse(plane_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
-            y = float.Parse(plane_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
-            z = float.Parse(plane_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
-            pv.plane_loc = new Vector3(x, y, z);
+            pv.plane_loc = PlayerInfo.StringToVec3(plane_pieces[1], plane_pieces[2], plane_pieces[3]);
 
             for (int i = 3; i < lines.Length; i++) 
             {
