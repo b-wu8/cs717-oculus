@@ -23,6 +23,7 @@ public class ServerEventHandler : MonoBehaviour
     public UdpClient client;
     private Thread receive_thread;
     private volatile bool thread_run = false;
+    private long receive_count = 0;
     IPEndPoint remoteEndPoint;
 
     public void Start()
@@ -60,9 +61,9 @@ public class ServerEventHandler : MonoBehaviour
         {
             Debug.Log("Thread ReceiveData: running");
 
-            Debug.Log("!!!!Before receive");
+            Debug.Log("Before receive count: " + receive_count);
             byte[] data = client.Receive(ref remoteEndPoint);
-            Debug.Log("!!!!After receive");
+            Debug.Log("After receive count" + receive_count);
             string text = Encoding.UTF8.GetString(data);
             last_packet = text;
             Debug.Log("Last packet: " + last_packet);
@@ -93,27 +94,16 @@ public class ServerEventHandler : MonoBehaviour
                         pv.player_infos.Add(players[0], new PlayerInfo(lines[i])); // add new player
                     }
 
-                    Debug.Log("new player info: " + pv.player_infos[players[0]].to_string());
-
-                    //PlayerInfo = pv.player_infos[players[0]];
-                    //string[] head_pieces = lines[i].Split(' ');
-                    //x = float.Parse(head_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
-                    //y = float.Parse(head_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
-                    //z = float.Parse(head_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
-                    //qx = float.Parse(head_pieces[4], CultureInfo.InvariantCulture.NumberFormat);
-                    //qy = float.Parse(head_pieces[5], CultureInfo.InvariantCulture.NumberFormat);
-                    //qz = float.Parse(head_pieces[6], CultureInfo.InvariantCulture.NumberFormat);
-                    //qw = float.Parse(head_pieces[7], CultureInfo.InvariantCulture.NumberFormat);
-                    //curr_player.headset = new Headset(new Vector3(x, y, z), new Quaternion(qx, qy, qz, qw));
-
+                    //Debug.Log("new player info: " + pv.player_infos[players[0]].to_string());
                     // TODO: LH RH   
                 }
                 catch (Exception e)
                 {
                     Debug.Log("Exception in server handler: " + e);
                 }
-                System.Threading.Thread.Sleep(config.receive_thread_sleep_time);
             }
+            System.Threading.Thread.Sleep(config.receive_thread_sleep_time);
+            receive_count += 1;
         }
     }
 }
