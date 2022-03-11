@@ -1,4 +1,8 @@
-﻿using System.Collections;
+﻿/*
+ * Rendering the hand of the current player
+ */
+
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;

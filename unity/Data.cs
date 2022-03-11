@@ -28,14 +28,27 @@ public class PlayerInfo
     public LeftHandController left_hand;
     public RightHandController right_hand;
     public string timestamp;
+    public bool is_new_timestemp = false;
     
     //string constructor
     public PlayerInfo(string name, Headset headset, LeftHandController left_hand, RightHandController right_hand)
     {
         this.name = name;
-        this.headset = (Headset) Headset.deep_copy(headset);
-        this.left_hand = (LeftHandController) LeftHandController.deep_copy(left_hand);
-        this.right_hand = (RightHandController) RightHandController.deep_copy(right_hand);
+        this.headset = new Headset(headset);
+        this.left_hand = new LeftHandController(left_hand);
+        this.right_hand = new RightHandController(right_hand);
+        //TODO: add joysticks
+    }
+
+    // copy contructor
+    public PlayerInfo(PlayerInfo other_player_info)
+    {
+        this.name = string.Copy(other_player_info.name);
+        this.headset = new Headset(other_player_info.headset);
+        this.left_hand = new LeftHandController(other_player_info.left_hand);
+        this.right_hand = new RightHandController(other_player_info.right_hand);
+        this.is_new_timestemp = other_player_info.is_new_timestemp;
+        //TODO: add joysticks
     }
 
     Vector3 StringToVec3(string str_x, string str_y, string str_z){
@@ -58,6 +71,7 @@ public class PlayerInfo
         this.left_hand = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(infos[11], infos[12], infos[13], infos[14]));
         this.right_hand = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(infos[18], infos[19], infos[20], infos[21]));
         this.timestamp = infos[22];
+        this.is_new_timestemp = true;
         // TODO: parse joystick
     }
 
@@ -91,6 +105,18 @@ public class TrackableDevice
         this.rotation.y = rot.y;
         this.rotation.z = rot.z;
         this.rotation.w = rot.w;
+    }
+
+    // copy constructor
+    public TrackableDevice(TrackableDevice other)
+    {
+        this.position.x = other.position.x;
+        this.position.y = other.position.y;
+        this.position.z = other.position.z;
+        this.rotation.x = other.rotation.x;
+        this.rotation.y = other.rotation.y;
+        this.rotation.z = other.rotation.z;
+        this.rotation.w = other.rotation.w;
     }
 
     public TrackableDevice()
@@ -135,6 +161,12 @@ public class Headset : TrackableDevice
     public Headset(Vector3 pos, Quaternion rot) : base(pos, rot)
     {
     }
+
+    //copy constructor
+    public Headset(Headset other): base(other)
+    {
+
+    }
 }
 
 public class LeftHandController : TrackableDevice
@@ -145,12 +177,21 @@ public class LeftHandController : TrackableDevice
     {
     }
 
+    // copy contructor
+    public LeftHandController(LeftHandController other) : base(other)
+    {
+    }
+
 }
 
 public class RightHandController : TrackableDevice
 {
     public RightHandController() : base() { }
     public RightHandController(Vector3 pos, Quaternion rot) : base(pos, rot)
+    {
+    }
+    // copy contructor
+    public RightHandController(RightHandController other) : base(other)
     {
     }
 }

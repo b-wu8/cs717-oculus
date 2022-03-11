@@ -1,3 +1,7 @@
+/**
+ *  This is a script for printing debug log onto an Unity UI text. 
+ */
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;

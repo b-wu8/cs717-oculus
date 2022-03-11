@@ -1,3 +1,7 @@
+/* 
+ * Handle all the incoming data from the server
+ */
+
 using UnityEngine;
 using System.Collections;
 
@@ -36,7 +40,7 @@ public class ServerEventHandler : MonoBehaviour
     private Vector3 xr_loc;
     private float x, y, z, qx, qy, qz, qw;
     private Thread receive_thread;
-    private int thread_sleep_time = 16;
+    private volatile bool thread_run = false;
 
     // todo: delete the debug variable
     public Text debug_display;
@@ -54,6 +58,13 @@ public class ServerEventHandler : MonoBehaviour
         receive_thread = new Thread(new ThreadStart(ReceiveData));
         receive_thread.IsBackground = true;
         receive_thread.Start();
+        thread_run = true;
+    }
+
+    public void OnApplicationQuit()
+    {
+        thread_run = false;
+        Debug.Log("Thread: ReceiveData stopped");
     }
 
     void OnGUI()
@@ -68,7 +79,8 @@ public class ServerEventHandler : MonoBehaviour
     {
         Debug.Log("Last packet: " + last_packet);
 
-        foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in pv.player_infos)
+        Dictionary<string, PlayerInfo> player_infos_copy = new Dictionary<string, PlayerInfo>(pv.player_infos);
+        foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in player_infos_copy)
         {
             Debug.Log("Player name: " + name_2_player_info.Key);
         }
@@ -77,7 +89,7 @@ public class ServerEventHandler : MonoBehaviour
     // receive thread
     private void ReceiveData()
     {
-        while (true)
+        while (thread_run)
         {
             IPEndPoint from_addr = new IPEndPoint(IPAddress.Any, 0);
             byte[] data = client.Receive(ref from_addr);
@@ -135,7 +147,7 @@ public class ServerEventHandler : MonoBehaviour
                 }
                 
             }
-            System.Threading.Thread.Sleep(thread_sleep_time);
+            System.Threading.Thread.Sleep(config.receive_thread_sleep_time);
         }
     }
 }

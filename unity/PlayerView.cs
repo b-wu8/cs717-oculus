@@ -1,10 +1,14 @@
+/* 
+ * Where all the variable for rendering is located.
+ */
+
 using System.Collections.Generic;
 using UnityEngine;
 using System;
 
 public class PlayerView : MonoBehaviour
 {
-    public Dictionary<string, PlayerInfo> player_infos = new Dictionary<string, PlayerInfo>(); // players
+    public volatile Dictionary<string, PlayerInfo> player_infos = new Dictionary<string, PlayerInfo>(); // players
     public Vector3 sphere_loc, plane_loc;
     public Config config;
     public int num_players = 0;
@@ -16,8 +20,8 @@ public class PlayerView : MonoBehaviour
     private GameObject sphere, plane;
     private Dictionary<int, Color> colors = new Dictionary<int, Color>();
     private int player_idx = 0;
-    private double max_latency = long.MinValue;
-    private double latency_sum = 0;
+    private double max_latency = double.MinValue;
+    private double latency_sum = Convert.ToDouble(0);
     private int latency_count = 0;
 
 // Start is called before the first frame update
@@ -53,22 +57,37 @@ public class PlayerView : MonoBehaviour
 
     private void LogLatency()
     {
-
-        if (player_infos.ContainsKey(config.player_name))
-        {
-            long old_timestamp = Int64.Parse(player_infos[config.player_name].timestamp);
-            long current_timestamp = Int64.Parse(GetTimeStamp(DateTime.Now));
-            Debug.Log("received timestamp: " + old_timestamp);
-            double latency = (((double)(current_timestamp - old_timestamp)) / ((double)10));
-            latency_sum += latency;
-            latency_count += 1;
-            Debug.Log("Latency in ms: " + latency);
-            if(latency > max_latency)
+        try
+        {  
+            if (player_infos.ContainsKey(config.player_name))
             {
-                max_latency = latency;
-                Debug.Log("Max latency in ms: " + latency);
+                PlayerInfo player_info_cpy = new PlayerInfo(player_infos[config.player_name]);
+                if(player_info_cpy.is_new_timestemp)
+                {
+                    string stamp = string.Copy(player_info_cpy.timestamp);
+                    long old_timestamp = Convert.ToInt64(stamp);
+                    long current_timestamp = Convert.ToInt64(GetTimeStamp(DateTime.Now));
+                    Debug.Log("received timestamp: " + old_timestamp);
+                    double latency = Convert.ToDouble(current_timestamp - old_timestamp) / Convert.ToDouble(10);
+                    latency_sum += latency;
+                    latency_count += 1;
+                    Debug.Log("Latency in ms: " + latency);
+                    if (latency > max_latency)
+                    {
+                        max_latency = latency;
+                        Debug.Log("Max latency in ms: " + latency);
+                    }
+                    Debug.Log("Average latency in ms: " + (latency_sum / Convert.ToDouble(latency_count)));
+                    player_infos[config.player_name].is_new_timestemp = false;
+                } else
+                {
+                    return;
+                }
             }
-            Debug.Log("Average latency in ms: " + (latency_sum/(double) latency_count));
+        }
+        catch (Exception ex)
+        {
+            Debug.Log("Exception in LogLatency: " + ex.ToString());
         }
     }
 
@@ -79,11 +98,11 @@ public class PlayerView : MonoBehaviour
         plane.transform.position = plane_loc;
 
         Debug.Log("Current player name : " + config.player_name);
-        Debug.Log("Player number :" + player_infos.Count);
-        Debug.Log("Player sphere position: " + sphere_loc.ToString());
+        Debug.Log("#Player in Lobby " + config.lobby + " :" + player_infos.Count);
         LogLatency();
 
-        foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in player_infos)
+        Dictionary<string, PlayerInfo> player_infos_copy = new Dictionary<string, PlayerInfo>(player_infos);
+        foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in player_infos_copy)
         {
             string player_name = name_2_player_info.Key;
 
@@ -140,7 +159,7 @@ public class PlayerView : MonoBehaviour
                 }
             } catch (Exception e)
             {
-                Debug.Log("Exception in player view: " + e);
+                Debug.Log("Exception in player view: " + e + " " + e.Message);
             }
         }
     }

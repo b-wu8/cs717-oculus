@@ -1,3 +1,7 @@
+/*
+ * This is where all the device inputs getters(e.g. the headset and lefthand controller) are located.
+ */
+
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
