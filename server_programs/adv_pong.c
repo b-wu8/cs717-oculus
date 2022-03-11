@@ -132,10 +132,10 @@ int main(int argc, char *argv[])
 
         // Display that we have received message
         format_addr(addr_str_buff, &remote_addr);
-        // printf("rain1 received %d byte message from %s: %s", bytes, addr_str_buff, mess);
-        // if (bytes && mess[bytes - 1] != '\n') {
-        //     printf("\n");
-        // }
+        printf("rain1 received %d byte message from %s: %s", bytes, addr_str_buff, mess);
+        if (bytes && mess[bytes - 1] != '\n') {
+            printf("\n");
+        }
 
         if (strlen(mess) < 6) {
             printf("Skipping short message...\n");
@@ -163,14 +163,14 @@ int main(int argc, char *argv[])
 
         // Format response
         format_response(response_buff, session);
-        // printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
+        printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
         for (i = 0; i < session->num_players; i++) {
             addr = &(session->players[i].addr);
             sendto(sk, response_buff, strlen(response_buff) + 1, 0, (struct sockaddr*)addr, sizeof(struct sockaddr_in));
 
             // Print address we are responding to
             format_addr(addr_str_buff, addr);
-            // printf("Responded to %s\n", addr_str_buff);
+            printf("Responded to %s\n", addr_str_buff);
         }
 
         session->sphere.t += 0.05;
@@ -241,9 +241,9 @@ int update_player_position(struct Session* session, char* mess) {
 
     player->timestamp = number_strings[25 + offset];
     
-    // for (k = 0; k < 16; k++) {
-    //     printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
-    // }
+    for (k = 0; k < 16; k++) {
+        printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
+    }
 
     return 0;
 }
@@ -259,15 +259,15 @@ int get_player_session(struct Session** session, struct SessionManager* session_
             for (int j = 0; j < session_manager->sessions[i].num_players; j++) {
                 if (strcmp(session_manager->sessions[i].players[j].name, name) == 0) {
                     *session = &(session_manager->sessions[i]);
-                    // printf("Found player \"%s\" in lobby \"%s\" (%d/%d)\n", name, lobby, (*session)->num_players, MAX_NUM_PLAYERS);
+                    printf("Found player \"%s\" in lobby \"%s\" (%d/%d)\n", name, lobby, (*session)->num_players, MAX_NUM_PLAYERS);
                     return 0;
                 }
             }
-            // printf("Player \"%s\" is not in lobby \"%s\"\n", name, lobby);
+            printf("Player \"%s\" is not in lobby \"%s\"\n", name, lobby);
             return 1;
         }
     }
-    // printf("Lobby \"%s\" does not exist\n", lobby);
+    printf("Lobby \"%s\" does not exist\n", lobby);
     return 1;
 }
 
@@ -321,14 +321,14 @@ int create_or_join_session(struct SessionManager* session_manager, char* mess, s
         if (strcmp(lobby, session->lobby) == 0) {
             for (int j = 0; j < session->num_players; j++) {
                 if (strcmp(name, session->players[j].name) == 0) {
-                    // printf("Player \"%s\" is already in lobby \"%s\" (%d/%d)\n", name, lobby, session->num_players, MAX_NUM_PLAYERS);
+                    printf("Player \"%s\" is already in lobby \"%s\" (%d/%d)\n", name, lobby, session->num_players, MAX_NUM_PLAYERS);
                     memcpy(&(session->players[j].addr), addr, sizeof(struct sockaddr_in));  // might have to update address
                     return 0;
                 }
             }
             // Only make it here if we are not in lobby
             if (session->num_players == MAX_NUM_PLAYERS) {
-                // printf("Player \"%s\" cannot join lobby \"%s\" (%d/%d)\n", name, lobby, MAX_NUM_PLAYERS, MAX_NUM_PLAYERS);
+                printf("Player \"%s\" cannot join lobby \"%s\" (%d/%d)\n", name, lobby, MAX_NUM_PLAYERS, MAX_NUM_PLAYERS);
                 return 1;
             }
             memcpy(&session->players[session->num_players].addr, addr, sizeof(struct sockaddr_in));
@@ -341,7 +341,7 @@ int create_or_join_session(struct SessionManager* session_manager, char* mess, s
 
     // Only make it here if no lobby exists with the given name
     if (session_manager->num_sessions == MAX_NUM_SESSIONS) {
-        // printf("Player \"%s\" cannot create lobby \"%s\". Max number of sessions are open (%d/%d)\n", name, lobby, MAX_NUM_SESSIONS, MAX_NUM_SESSIONS);
+        printf("Player \"%s\" cannot create lobby \"%s\". Max number of sessions are open (%d/%d)\n", name, lobby, MAX_NUM_SESSIONS, MAX_NUM_SESSIONS);
         return 2;
     }
 
