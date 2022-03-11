@@ -81,7 +81,7 @@ public class PlayerView : MonoBehaviour
         Debug.Log("Current player name : " + config.player_name);
         Debug.Log("Player number :" + player_infos.Count);
         Debug.Log("Player sphere position: " + sphere_loc.ToString());
-        LogLatency();
+        //LogLatency();
 
         foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in player_infos)
         {
