@@ -102,6 +102,7 @@ public class PlayerView : MonoBehaviour
         Debug.Log("#Player in Lobby " + config.lobby + " :" + player_infos.Count);
         LogLatency();
 
+        // render all the players
         Dictionary<string, PlayerInfo> player_infos_copy = new Dictionary<string, PlayerInfo>(player_infos);
         foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in player_infos_copy)
         {
@@ -117,17 +118,17 @@ public class PlayerView : MonoBehaviour
                     // update head position and rotation
                     player_heads[player_name].transform.position = player_info.headset.position;
                     player_heads[player_name].transform.rotation = player_info.headset.rotation;
-                    Debug.Log("Player " + player_name + "head pos:" + player_info.headset.position.ToString());
+                    Debug.Log("Player " + player_name + " head pos:" + player_info.headset.position.ToString());
 
                     // update left hand position and rotation
                     player_lefthands[player_name].transform.position = player_info.left_hand.position;
                     player_lefthands[player_name].transform.rotation = player_info.left_hand.rotation;
-                    Debug.Log("Player " + player_name + "lefthand pos:" + player_info.left_hand.position.ToString());
+                    Debug.Log("Player " + player_name + " lefthand pos:" + player_info.left_hand.position.ToString());
 
                     // update right hand position and rotation
                     player_righthands[player_name].transform.position = player_info.right_hand.position;
                     player_righthands[player_name].transform.rotation = player_info.right_hand.rotation;
-                    Debug.Log("Player " + player_name + "righthand pos:" + player_info.left_hand.position.ToString());
+                    Debug.Log("Player " + player_name + " righthand pos:" + player_info.left_hand.position.ToString());
                 }
                 else // new player
                 {

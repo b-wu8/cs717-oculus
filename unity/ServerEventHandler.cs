@@ -23,12 +23,13 @@ public class ServerEventHandler : MonoBehaviour
     public UdpClient client;
     private Thread receive_thread;
     private volatile bool thread_run = false;
+    IPEndPoint remoteEndPoint;
 
     public void Start()
     {
         client = new UdpClient();
         byte[] temp = Encoding.UTF8.GetBytes(Constants.SYN + " " + config.player_name + " " + config.lobby);
-        IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
+        remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
         client.Send(temp, temp.Length, remoteEndPoint);
         client.Send(temp, temp.Length, remoteEndPoint);
 
@@ -41,7 +42,7 @@ public class ServerEventHandler : MonoBehaviour
     public void OnApplicationQuit()
     {
         thread_run = false;
-        Debug.Log("Thread: ReceiveData stopped");
+        Debug.Log("Thread ReceiveData: stopped");
     }
 
     void OnGUI()
@@ -52,20 +53,19 @@ public class ServerEventHandler : MonoBehaviour
         GUI.Box(rectObj, "Last Packet: \n" + last_packet, style);
     }
 
-    public void Update()
-    {
-        Debug.Log("Last packet: " + last_packet);
-    }
-
     // receive thread
     private void ReceiveData()
     {
         while (thread_run)
         {
-            IPEndPoint from_addr = new IPEndPoint(IPAddress.Any, 0);
-            byte[] data = client.Receive(ref from_addr);
+            Debug.Log("Thread ReceiveData: running");
+
+            Debug.Log("!!!!Before receive");
+            byte[] data = client.Receive(ref remoteEndPoint);
+            Debug.Log("!!!!After receive");
             string text = Encoding.UTF8.GetString(data);
             last_packet = text;
+            Debug.Log("Last packet: " + last_packet);
             string[] lines = text.Split('\n');
 
             string[] msg = lines[0].Split(' ');
@@ -73,12 +73,12 @@ public class ServerEventHandler : MonoBehaviour
 
             string[] sphere_pieces = lines[1].Split(' ');
             pv.sphere_loc = PlayerInfo.StringToVec3(sphere_pieces[1], sphere_pieces[2], sphere_pieces[3]);
-            
+
 
             string[] plane_pieces = lines[2].Split(' ');
             pv.plane_loc = PlayerInfo.StringToVec3(plane_pieces[1], plane_pieces[2], plane_pieces[3]);
 
-            for (int i = 3; i < lines.Length; i++) 
+            for (int i = 3; i < lines.Length; i++)
             {
                 string[] players = lines[i].Split(' ');
                 try
@@ -86,11 +86,14 @@ public class ServerEventHandler : MonoBehaviour
                     if (pv.player_infos.ContainsKey(players[0]))
                     {
                         pv.player_infos[players[0]] = new PlayerInfo(lines[i]);
-                    } else
+                    }
+                    else
                     {
                         //Debug.Log("New player being added");
                         pv.player_infos.Add(players[0], new PlayerInfo(lines[i])); // add new player
                     }
+
+                    Debug.Log("new player info: " + pv.player_infos[players[0]].to_string());
 
                     //PlayerInfo = pv.player_infos[players[0]];
                     //string[] head_pieces = lines[i].Split(' ');

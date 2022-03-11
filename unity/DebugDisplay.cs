@@ -10,6 +10,7 @@ using UnityEngine.UI;
 public class DebugDisplay : MonoBehaviour
 {
     Dictionary<string, string> debugLogs = new Dictionary<string, string>();
+    string displayText = "";
     public string stack = "";
     public Text display;
      
@@ -22,6 +23,11 @@ public class DebugDisplay : MonoBehaviour
     }
     void OnDisable(){
         Application.logMessageReceivedThreaded  -= HandleLog;
+    }
+
+    public void FixedUpdate()
+    {
+        display.text = displayText;
     }
 
     void HandleLog(string logString, string stackTrace, LogType type){
@@ -52,16 +58,26 @@ public class DebugDisplay : MonoBehaviour
                 debugLogs.Add(debugKey, debugValue);
             }
 
-            debugLogs.Add("Stack : ", stackTrace);
+
+            if (debugLogs.ContainsKey("Stack"))
+            {
+                debugLogs[debugKey] = stackTrace;
+            }
+            else
+            {
+                debugLogs.Add("Stack", stackTrace);
+            }
         }
 
-        string displayText = "";
-        foreach (KeyValuePair<string, string> log in debugLogs) {
+        displayText = "";
+
+        Dictionary<string, string> debug_log_copy = new Dictionary<string, string>(debugLogs);
+        foreach (KeyValuePair<string, string> log in debug_log_copy) {
             if(log.Value == "") 
                 displayText += log.Key + "\n";
             else
                 displayText += log.Key + ": " + log.Value + "\n";
         }
-        display.text = displayText;
+        
     }
 }

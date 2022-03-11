@@ -42,7 +42,7 @@ public class ControllerEventHandler : MonoBehaviour
     public void OnApplicationQuit()
     {
         thread_run = false;
-        Debug.Log("Thread: SendData stopped");
+        Debug.Log("Thread SendData: stopped");
     }
 
     /*
@@ -70,6 +70,8 @@ public class ControllerEventHandler : MonoBehaviour
     {
         while (thread_run)
         {
+            Debug.Log("Thread SendData: running");
+
             try
             {
                 string data = System.String.Empty;
