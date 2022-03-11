@@ -55,12 +55,6 @@ public class ServerEventHandler : MonoBehaviour
     public void Update()
     {
         Debug.Log("Last packet: " + last_packet);
-
-        Dictionary<string, PlayerInfo> player_infos_copy = new Dictionary<string, PlayerInfo>(pv.player_infos);
-        foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in player_infos_copy)
-        {
-            Debug.Log("Player name: " + name_2_player_info.Key);
-        }
     }
 
     // receive thread
@@ -115,9 +109,8 @@ public class ServerEventHandler : MonoBehaviour
                 {
                     Debug.Log("Exception in server handler: " + e);
                 }
-                
+                System.Threading.Thread.Sleep(config.receive_thread_sleep_time);
             }
-            System.Threading.Thread.Sleep(config.receive_thread_sleep_time);
         }
     }
 }

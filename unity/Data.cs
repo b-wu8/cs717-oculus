@@ -29,16 +29,6 @@ public class PlayerInfo
     public RightHandController right_hand;
     public string timestamp;
     public bool is_new_timestemp = false;
-    
-    //string constructor
-    public PlayerInfo(string name, Headset headset, LeftHandController left_hand, RightHandController right_hand)
-    {
-        this.name = name;
-        this.headset = new Headset(headset);
-        this.left_hand = new LeftHandController(left_hand);
-        this.right_hand = new RightHandController(right_hand);
-        //TODO: add joysticks
-    }
 
     // copy contructor
     public PlayerInfo(PlayerInfo other_player_info)
@@ -47,6 +37,7 @@ public class PlayerInfo
         this.headset = new Headset(other_player_info.headset);
         this.left_hand = new LeftHandController(other_player_info.left_hand);
         this.right_hand = new RightHandController(other_player_info.right_hand);
+        this.timestamp = string.Copy(other_player_info.timestamp);
         this.is_new_timestemp = other_player_info.is_new_timestemp;
         //TODO: add joysticks
     }
@@ -70,7 +61,7 @@ public class PlayerInfo
         this.headset = new Headset(StringToVec3(infos[1], infos[2], infos[3]), StringToQuat(infos[4], infos[5], infos[6], infos[7]));
         this.left_hand = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(infos[11], infos[12], infos[13], infos[14]));
         this.right_hand = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(infos[18], infos[19], infos[20], infos[21]));
-        this.timestamp = infos[22];
+        this.timestamp = string.Copy(infos[22]);
         this.is_new_timestemp = true;
         // TODO: parse joystick
     }
