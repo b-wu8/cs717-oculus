@@ -68,10 +68,12 @@ public class ServerEventHandler : MonoBehaviour
     {
         Debug.Log("Last packet: " + last_packet);
 
+        /*
         foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in pv.player_infos)
         {
             Debug.Log("Player name: " + name_2_player_info.Key);
         }
+        */
     }
 
     // receive thread
