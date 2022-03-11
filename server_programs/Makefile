@@ -4,15 +4,12 @@ include ../Makefile.general
 
 top_srcdir=..
 
-SERVER_PRORGRAMS=adv_pong_pos adv_pong adv_receiver adv_sender
+SERVER_PRORGRAMS=oculus_server adv_receiver adv_sender
 
 all: $(SERVER_PRORGRAMS)
 
-adv_pong_pos: adv_pong_pos.o $(LIBSPINES_LIB_FILE)
-		$(CC) $(LDFLAGS) -o $ adv_pong_pos adv_pong_pos.o $(LIBS)
-
-adv_pong: adv_pong.o $(LIBSPINES_LIB_FILE)
-		$(CC) $(LDFLAGS) -o $ adv_pong adv_pong.o $(LIBS)
+oculus_server: oculus_server.o $(LIBSPINES_LIB_FILE)
+		$(CC) $(LDFLAGS) -o $ oculus_server oculus_server.o $(LIBS)
 
 adv_receiver: adv_receiver.o $(LIBSPINES_LIB_FILE)
 		$(CC) $(LDFLAGS) -o $ adv_receiver adv_receiver.o $(LIBS)
