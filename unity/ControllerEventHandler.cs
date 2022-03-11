@@ -3,11 +3,14 @@
  */
 
 using UnityEngine;
+using System.Collections;
 using System;
 using System.Text;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Runtime.InteropServices;
+using System.Globalization;
 
 /*
  * Event handler for Oculus.
@@ -17,7 +20,7 @@ public class ControllerEventHandler : MonoBehaviour
     public Config config; // must map in Unity Engine
     public DeviceInfoWatcher device_watcher;
     private Thread sendThread; // TODO: stop the thread if game ix killed
-    private volatile bool thread_run = false;
+    private int thread_sleep_time = 16;
 
     // remote_ip_address, remote_port = server IP address, server port
     IPEndPoint remoteEndPoint;
@@ -39,12 +42,6 @@ public class ControllerEventHandler : MonoBehaviour
             Debug.Log("Err: Sending failure.");
     }
 
-    public void OnApplicationQuit()
-    {
-        thread_run = false;
-        Debug.Log("Thread SendData: stopped");
-    }
-
     /*
      * Initialization.
      */
@@ -57,7 +54,6 @@ public class ControllerEventHandler : MonoBehaviour
         sendThread = new Thread(new ThreadStart(SendData));
         sendThread.IsBackground = true;
         sendThread.Start();
-        thread_run = true;
     }
     public static string GetTimeStamp(DateTime time){
         return time.ToString("yyyyMMddHHmmssffff");
@@ -68,10 +64,8 @@ public class ControllerEventHandler : MonoBehaviour
      */
     private void SendData()
     {
-        while (thread_run)
+        while (true)
         {
-            Debug.Log("Thread SendData: running");
-
             try
             {
                 string data = System.String.Empty;
@@ -94,12 +88,13 @@ public class ControllerEventHandler : MonoBehaviour
                 else
                     Debug.Log("Err: Sending failure.");
 
+                System.Threading.Thread.Sleep(thread_sleep_time);
+
             }
             catch (Exception e)
             {
                 Debug.Log("Exception: " + e.Message);
             }
-            System.Threading.Thread.Sleep(config.send_thread_sleep_time);
         }
     }
 }
