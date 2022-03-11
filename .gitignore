@@ -1,6 +1,10 @@
 # Unity meta files
 *.meta
 
+# vscode
+.vscode
+
+
 # Prerequisites
 *.d
 
