@@ -14,6 +14,7 @@ public class Config : MonoBehaviour
     public int local_port;
     public string player_name;
     public string lobby = "DEFAULT";
-    public int send_thread_sleep_time = 100;
-    public int receive_thread_sleep_time = 100;
+    public int sleep_ms = 50;
+    // public int send_thread_sleep_time = 100;
+    // public int receive_thread_sleep_time = 100;
 }

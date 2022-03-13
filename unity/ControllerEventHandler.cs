@@ -19,11 +19,13 @@ public class ControllerEventHandler : MonoBehaviour
 {
     public Config config; // must map in Unity Engine
     public DeviceInfoWatcher device_watcher;
-    private Thread sendThread; // TODO: stop the thread if game ix killed
-    private int thread_sleep_time = 16;
+    private Thread thread; // TODO: stop the thread if game ix killed
+
+    public ServerEventHandler se_handler;
 
     // remote_ip_address, remote_port = server IP address, server port
-    IPEndPoint remoteEndPoint;
+    private UdpClient client;
+    private IPEndPoint server_endpoint;
 
     /*
      * Start from Unity Engine.
@@ -31,33 +33,31 @@ public class ControllerEventHandler : MonoBehaviour
 
     public void Start()
     {
-        init();
-        byte[] first_data = Encoding.UTF8.GetBytes(Constants.SYN + " " + config.player_name + " " + config.lobby);
-        UdpClient client = new UdpClient();
-        int sent_bytes = client.Send(first_data, first_data.Length, remoteEndPoint);
-        sent_bytes = client.Send(first_data, first_data.Length, remoteEndPoint); //TODO: 0.0.0.0:0
-        if (sent_bytes == first_data.Length)
-            Debug.Log("Sent to " + config.remote_ip_address + ":" + Constants.SYN + " " + config.player_name + " " + config.lobby);
-        else
-            Debug.Log("Err: Sending failure.");
-    }
-
-    /*
-     * Initialization.
-     */
-    private void init()
-    { 
-        // remote_ip_address, remote_port = server IP address, server port
-        remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
+        /*
+        string payload = Constants.SYN + " " + config.player_name + " " + config.lobby;
+        byte[] data = Encoding.UTF8.GetBytes(payload);
+        client = new UdpClient();
+        server_endpoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
+        client.Send(data, data.Length, server_endpoint);
+        */
+        client = new UdpClient();
+        server_endpoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
 
         // Run SendData() in the background  thread
-        sendThread = new Thread(new ThreadStart(SendData));
-        sendThread.IsBackground = true;
-        sendThread.Start();
+        thread = new Thread(new ThreadStart(SendData));
+        thread.IsBackground = true;
+        thread.Start();
     }
+
     public static string GetTimeStamp(DateTime time){
         return time.ToString("yyyyMMddHHmmssffff");
     }
+
+    void OnApplicationQuit() {
+        if (thread != null)
+            thread.Abort();
+    }
+
 
     /*
      * Send data in string format to the server.
@@ -66,35 +66,31 @@ public class ControllerEventHandler : MonoBehaviour
     {
         while (true)
         {
+            System.Threading.Thread.Sleep(config.sleep_ms);
+            string data = System.String.Empty;
+
+            data += Constants.INPUT + " "; 
+            data += config.player_name + " ";
+            data += config.lobby + " ";
+            data += device_watcher.GetHeadset().to_string() + " ";
+            data += device_watcher.GetLeftHandController().to_string() + " ";
+            data += device_watcher.GetRightHandController().to_string()+ " ";
+            data += device_watcher.GetLeftJoystick().to_string() + " ";
+            data += device_watcher.GetRightJoystick().to_string() + " ";
+            data += GetTimeStamp(DateTime.Now);
+
+            byte[] bytes = Encoding.UTF8.GetBytes(data);
+            client.Send(bytes, bytes.Length, server_endpoint);
+            /*
             try
             {
-                string data = System.String.Empty;
-
-                data += Constants.INPUT + " "; 
-                data += config.player_name + " ";
-                data += config.lobby + " ";
-                data += device_watcher.GetHeadset().to_string() + " ";
-                data += device_watcher.GetLeftHandController().to_string() + " ";
-                data += device_watcher.GetRightHandController().to_string()+ " ";
-                data += device_watcher.GetLeftJoystick().to_string() + " ";
-                data += device_watcher.GetRightJoystick().to_string() + " ";
-                data += GetTimeStamp(DateTime.Now);
-
-                byte[] data_bytes = Encoding.UTF8.GetBytes(data);
-                UdpClient client = new UdpClient();
-                int sent_bytes = client.Send(data_bytes, data_bytes.Length, remoteEndPoint);
-                if (sent_bytes == data_bytes.Length)
-                    Debug.Log("Sent to " + config.remote_ip_address + ":" + data);
-                else
-                    Debug.Log("Err: Sending failure.");
-
-                System.Threading.Thread.Sleep(thread_sleep_time);
-
+                
             }
             catch (Exception e)
             {
                 Debug.Log("Exception: " + e.Message);
             }
+            */
         }
     }
 }

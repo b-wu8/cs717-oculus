@@ -14,15 +14,20 @@
 #include "spu_events.h"
 #include "spu_alarm.h"
 #include "math.h"
+#include <stdbool.h>
 
 #define SPINES_PORT 8100
 #define MAX_BYTES 100000
 #define MAX_NUM_PLAYERS 16
 #define MAX_NUM_SESSIONS 16
+#define MAX_TOTAL_PLAYERS (MAX_NUM_PLAYERS + MAX_NUM_SESSIONS)
+#define DEFAULT_TIMEOUT_SEC 10  // 10 seconds until player timeout
 #define RESPONSE_SIZE 2048
+
 #define SYN "1" // first message from client
 #define INPUT "2" // client update message
 #define FIN "3" // client's explicite exit message
+#define HEARTBEAT "4" // client sends keep-alive message
 
 struct Position {
     float x;
@@ -37,15 +42,26 @@ struct Quaternion {
     float w;
 };
 
-struct Pose {
+struct Transform {
     struct Position pos;
     struct Quaternion quat;
 };
 
+struct Joystick {
+    float x;
+    float z;
+};
+
+struct Controller {
+    struct Transform transform;
+    struct Joystick joystick;
+};
+
 struct Avatar {
-    struct Pose headset;
-    struct Pose left_hand;
-    struct Pose right_hand;
+    struct Position offset;
+    struct Transform head;
+    struct Controller left;
+    struct Controller right;
 };
 
 struct Sphere {
@@ -61,12 +77,16 @@ struct Player {
     char name[64];
     struct Avatar avatar;
     struct sockaddr_in addr;
-    char* timestamp;
+    struct timeval timestamp;
+    char* ping;
 };
 
 struct Session {
     char lobby[64];
     int num_players;
+    int has_changed;
+    int timeout_sec;
+    double timestep;
     struct Player players[MAX_NUM_PLAYERS];  // Dynamically allocate memory later
     struct Sphere sphere;
     struct Plane plane;
@@ -75,6 +95,7 @@ struct Session {
 struct SessionManager {
     struct Session sessions[MAX_NUM_SESSIONS];
     int num_sessions;
+    double timestep;
 };
 
 void format_addr(char *buf, struct sockaddr_in* addr);
@@ -85,6 +106,11 @@ int create_or_join_session(struct SessionManager* session_manager, char* mess, s
 int format_response(char* response, struct Session* session);
 int get_player_session(struct Session** session, struct SessionManager* session_manager, char* mess);
 int update_player_position(struct Session* session, char* mess);
+int update_player_timestamp(struct Session* session, char* mess);
+int check_timeouts(struct SessionManager* session_manager);
+int apply_movement_step(struct Session* session);
+int leave_session(struct SessionManager* session_manager, char* mess);
+void move_sphere(struct Sphere* sphere, int timeout_ms);
 
 int main(int argc, char *argv[])
 {
@@ -92,12 +118,12 @@ int main(int argc, char *argv[])
     struct sockaddr_in remote_addr;
     socklen_t remote_len;
     struct timeval timeout;
-    fd_set mask, dummy_mask, temp_mask;
+    fd_set mask, temp_mask;
     char mess[MAX_BYTES];
 
     // Verify command line invocation
-    if(argc != 3){
-        printf("Usage: ./oculus_server <ip> <port> <time_step (default=10ms)>");
+    if(argc != 4){
+        printf("Usage: ./oculus_server <ip> <port> <time_step (default=10ms)>\n");
         exit(1);
     }
 
@@ -119,76 +145,171 @@ int main(int argc, char *argv[])
     struct timeval loop_timeout;
     struct SessionManager session_manager;
     memset(&session_manager, 0, sizeof(session_manager));
+    session_manager.timestep = ((double) timeout_ms) / 1000;
     char addr_str_buff[256];
     memset(addr_str_buff, 0, 256);
     char response_buff[RESPONSE_SIZE];
     memset(response_buff, 0, RESPONSE_SIZE);
-    int num, bytes, i;
+    int num, bytes, i, j;
     
     // Create temporary buffers for print outs
     printf("Awaiting messages from Oculus...\n");
 
     // Tbh, I still don't know how masks work
     FD_ZERO(&mask);
-    FD_ZERO(&dummy_mask);
     FD_SET(sk, &mask);
+    memcpy(&loop_timeout, &timeout, sizeof(struct timeval));
     for (;;)
-    {   
+    { 
         // Receive packet
         temp_mask = mask;
-        memset(&loop_timeout, &timeout, sizeof(struct timeval));
-        num = select(FD_SETSIZE, &temp_mask, &dummy_mask, &dummy_mask, NULL);
-        bytes = recvfrom(sk, mess, sizeof(mess), 0, (struct sockaddr *)&remote_addr, &remote_len);
-        mess[bytes] = 0;  // Ad null-terminator to string (soemtimes this is redundant)
+        num = select(FD_SETSIZE, &temp_mask, NULL, NULL, &loop_timeout);
 
-        // Display that we have received message
-        format_addr(addr_str_buff, &remote_addr);
-        printf("rain1 received %d byte message from %s: %s", bytes, addr_str_buff, mess);
-        if (bytes && mess[bytes - 1] != '\n') {
-            printf("\n");
-        }
+        if (num > 0) {  // Received message
+            bytes = recvfrom(sk, mess, sizeof(mess), 0, (struct sockaddr *)&remote_addr, &remote_len);
+            mess[bytes] = 0;  // Ad null-terminator to string (soemtimes this is redundant)
 
-        if (strlen(mess) < 6) {
-            printf("Skipping short message...\n");
-            continue;
-        }
+            // Display that we have received message
+            format_addr(addr_str_buff, &remote_addr);
+            printf("rain1 received %d byte message from %s: %s", bytes, addr_str_buff, mess);
+            if (bytes && mess[bytes - 1] != '\n')
+                printf("\n");
 
-        // Check if this is oculus server
-        if (strncmp(mess, SYN, 1) == 0) {  // FIXME
-            if (create_or_join_session(&session_manager, mess, &remote_addr) != 0) {
-                continue;  // We should send back an error response later
-            }
-        }
+            if (strncmp(mess, SYN, 1) == 0)  // FIXME
+                if (create_or_join_session(&session_manager, mess, &remote_addr) != 0)
+                    continue;  // We should send back an error response later
 
-        if (get_player_session(&session, &session_manager, mess) != 0) {
-            continue;
-        }
+            if (strncmp(mess, FIN, 1) == 0)  // FIXME
+                if (leave_session(&session_manager, mess) != 0)
+                    continue;  // We should send back an error response later
 
-        if (strncmp(mess, INPUT, 1) == 0) {
-            if (update_player_position(session, mess) != 0) {
+            if (get_player_session(&session, &session_manager, mess) != 0)
                 continue;
+
+            if (strncmp(mess, INPUT, 1) == 0)
+                if (update_player_position(session, mess) != 0)
+                    continue;
+            
+            if (strncmp(mess, HEARTBEAT, 1) == 0)
+                if (update_player_timestamp(session, mess) != 0)
+                    continue;
+
+        } else { // timeout
+            check_timeouts(&session_manager);
+            for (i = 0; i < session_manager.num_sessions; i++) {
+                session = &session_manager.sessions[i];
+                apply_movement_step(session);
+                if (session->has_changed) {
+                    format_response(response_buff, session);
+                    // printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
+                    for (j = 0; j < session->num_players; j++) {
+                        addr = &(session->players[j].addr);
+                        sendto(sk, response_buff, strlen(response_buff) + 1, 0, (struct sockaddr*)addr, sizeof(struct sockaddr_in));
+
+                        // Print address we are responding to
+                        format_addr(addr_str_buff, addr);
+                        // printf("Responded to %s\n", addr_str_buff);
+                    }
+                    session->has_changed = 0;
+                }
+                move_sphere(&session->sphere, timeout_ms);
+                session->has_changed = 1;  // Moved ball
             }
+            memcpy(&loop_timeout, &timeout, sizeof(struct timeval));  // Reset loop timeout
         }
-
-        // todo: player exit :if (atoi(mess[0]) == FIN) 
-
-        // Format response
-        format_response(response_buff, session);
-        printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
-        for (i = 0; i < session->num_players; i++) {
-            addr = &(session->players[i].addr);
-            sendto(sk, response_buff, strlen(response_buff) + 1, 0, (struct sockaddr*)addr, sizeof(struct sockaddr_in));
-
-            // Print address we are responding to
-            format_addr(addr_str_buff, addr);
-            printf("Responded to %s\n", addr_str_buff);
-        }
-
-        session->sphere.t += 0.05;
-        session->sphere.pos.x = 4 * cos(session->sphere.t * 2 * M_PI);
-        session->sphere.pos.y = sin(session->sphere.t * 2 * M_PI / 16) + 3;
-        session->sphere.pos.z = 4 * sin(session->sphere.t * 2 * M_PI);
     }
+}
+
+void move_sphere(struct Sphere* sphere, int timeout_ms) {
+    sphere->t += 2 * M_PI / 15 * timeout_ms / 1000;  // rotate at 15 rev per sec
+    sphere->pos.x = 4 * cos(sphere->t);
+    sphere->pos.y = 2 * sin(sphere->t / 4 + 1) + 4;
+    sphere->pos.z = 4 * sin(sphere->t);
+}
+
+int check_timeouts(struct SessionManager* session_manager) {    
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+
+    char removal_messages[MAX_TOTAL_PLAYERS][128];
+    memset(removal_messages, 0, 16 * 128);
+    int num_timeouts = 0;
+    struct Session* session;
+
+    for (int i = 0; i < session_manager->num_sessions; i++) {
+        session = &session_manager->sessions[i];
+        for (int j = 0; j < session->num_players; j++) 
+            if (current_time.tv_sec - session->players[j].timestamp.tv_sec > session->timeout_sec)
+                sprintf(removal_messages[num_timeouts++], "%s %s %s", FIN, session->players[j].name, session->lobby);
+    }
+    
+    for (int i = 0; i < num_timeouts; i++) 
+        leave_session(session_manager, removal_messages[i]);
+    
+    return num_timeouts;
+}
+
+//static int count = 0;
+
+int apply_movement_step(struct Session* session) {
+    struct Avatar* avatar;
+
+    // float x_hat, z_hat, hat_mag, w_prime, forward_step, right_step;
+    for (int j = 0; j < session->num_players; j++) {
+        avatar = &session->players[j].avatar;
+        /*
+        w_prime = sqrt(1 - pow(avatar->head.quat.w, 2));
+        x_hat = avatar->head.quat.x / w_prime;
+        z_hat = avatar->head.quat.z / w_prime;
+        if (count++ % 10 == 0) {
+            printf("qx = %0.3f  qy = %0.3f  qz = %0.3f  qw = %0.3f\n", avatar->right.transform.quat.x, avatar->right.transform.quat.y, avatar->right.transform.quat.z, avatar->right.transform.quat.w);
+            w_prime = sqrt(1 - pow(avatar->right.transform.quat.w, 2));
+            printf("x  = %0.3f  y  = %0.3f  z  = %0.3f\n", avatar->right.transform.quat.x / w_prime, avatar->right.transform.quat.y / w_prime, avatar->right.transform.quat.z / w_prime);
+            //printf("qx = %0.3f  qy = %0.3f  qz = %0.3f  qw = %0.3f\n", avatar->head.quat.x, avatar->head.quat.y, avatar->head.quat.z, avatar->head.quat.w);
+            //printf("x  = %0.3f  y  = %0.3f  z  = %0.3f\n", x_hat, avatar->head.quat.y / w_prime, z_hat);
+        }
+        hat_mag = sqrt(pow(x_hat, 2) + pow(z_hat, 2));
+        x_hat /= hat_mag;
+        z_hat /= hat_mag;
+        if (isnanf(x_hat) || isinff(x_hat) || isnanf(z_hat) || isinff(z_hat)) {  
+            printf("Couldn't resolve quaternion [x, y, z, w] = [%0.3f, %0.3f, %0.3f, %0.3f]\n",
+                avatar->head.quat.x, avatar->head.quat.y, avatar->head.quat.z, avatar->head.quat.w);
+            continue;
+        }
+        if (fabs(avatar->right.joystick.z) > 0.2) {
+            forward_step = avatar->right.joystick.z * session->timestep;
+            avatar->offset.x += forward_step * x_hat;
+            avatar->offset.z += forward_step * z_hat;
+        }
+        if (fabs(avatar->right.joystick.x) > 0.2) {
+            // Geometric rotation 90 deg clockwise in xz plane
+            right_step = avatar->right.joystick.x * session->timestep;
+            avatar->offset.x += right_step * z_hat;
+            avatar->offset.z += -right_step * x_hat;
+        }
+        */
+       
+        if (fabs(avatar->right.joystick.z) > 0.2)
+            avatar->offset.z += avatar->right.joystick.z * session->timestep;
+        if (fabs(avatar->right.joystick.x) > 0.2) 
+            avatar->offset.x += avatar->right.joystick.x * session->timestep;
+    }
+    return 0;
+}
+
+int update_player_timestamp(struct Session* session, char* mess) {
+    char dummy_type[64];
+    char name[64];
+    char dummy_lobby[64];
+    sscanf(mess, "%s %s %s", dummy_type, name, dummy_lobby);
+
+    for (int i = 0; i < session->num_players; i++)
+        if (strcmp(session->players[i].name, name) == 0) {
+            gettimeofday(&session->players[i].timestamp, NULL);
+            return 0;
+        }
+
+    return 1;
 }
 
 int update_player_position(struct Session* session, char* mess) {
@@ -226,35 +347,42 @@ int update_player_position(struct Session* session, char* mess) {
     }
 
     struct Player* player = &(session->players[player_idx]);
-    player->avatar.headset.pos.x = numbers[0];
-    player->avatar.headset.pos.y = numbers[1];
-    player->avatar.headset.pos.z = numbers[2];
-    player->avatar.headset.quat.x = numbers[3];
-    player->avatar.headset.quat.y = numbers[4];
-    player->avatar.headset.quat.z = numbers[5];
-    player->avatar.headset.quat.w = numbers[6];
+    player->avatar.head.pos.x = numbers[0];
+    player->avatar.head.pos.y = numbers[1];
+    player->avatar.head.pos.z = numbers[2];
+    player->avatar.head.quat.x = numbers[3];
+    player->avatar.head.quat.y = numbers[4];
+    player->avatar.head.quat.z = numbers[5];
+    player->avatar.head.quat.w = numbers[6];
 
-    player->avatar.left_hand.pos.x = numbers[7];
-    player->avatar.left_hand.pos.y = numbers[8];
-    player->avatar.left_hand.pos.z = numbers[9];
-    player->avatar.left_hand.quat.x = numbers[10];
-    player->avatar.left_hand.quat.y = numbers[11];
-    player->avatar.left_hand.quat.z = numbers[12];
-    player->avatar.left_hand.quat.w = numbers[13];
+    player->avatar.left.transform.pos.x = numbers[7];
+    player->avatar.left.transform.pos.y = numbers[8];
+    player->avatar.left.transform.pos.z = numbers[9];
+    player->avatar.left.transform.quat.x = numbers[10];
+    player->avatar.left.transform.quat.y = numbers[11];
+    player->avatar.left.transform.quat.z = numbers[12];
+    player->avatar.left.transform.quat.w = numbers[13];
 
-    player->avatar.right_hand.pos.x = numbers[14];
-    player->avatar.right_hand.pos.y = numbers[15];
-    player->avatar.right_hand.pos.z = numbers[16];
-    player->avatar.right_hand.quat.x = numbers[17];
-    player->avatar.right_hand.quat.y = numbers[18];
-    player->avatar.right_hand.quat.z = numbers[19];
-    player->avatar.right_hand.quat.w = numbers[20];
+    player->avatar.right.transform.pos.x = numbers[14];
+    player->avatar.right.transform.pos.y = numbers[15];
+    player->avatar.right.transform.pos.z = numbers[16];
+    player->avatar.right.transform.quat.x = numbers[17];
+    player->avatar.right.transform.quat.y = numbers[18];
+    player->avatar.right.transform.quat.z = numbers[19];
+    player->avatar.right.transform.quat.w = numbers[20];
 
-    player->timestamp = number_strings[25 + offset];
+    player->avatar.left.joystick.x = numbers[21];
+    player->avatar.left.joystick.z = numbers[22];
+    player->avatar.right.joystick.x = numbers[23];
+    player->avatar.right.joystick.z = numbers[24];
+
+    player->ping = number_strings[25 + offset];
     
+    /*
     for (k = 0; k < 16; k++) {
         printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
     }
+    */
 
     return 0;
 }
@@ -270,7 +398,7 @@ int get_player_session(struct Session** session, struct SessionManager* session_
             for (int j = 0; j < session_manager->sessions[i].num_players; j++) {
                 if (strcmp(session_manager->sessions[i].players[j].name, name) == 0) {
                     *session = &(session_manager->sessions[i]);
-                    printf("Found player \"%s\" in lobby \"%s\" (%d/%d)\n", name, lobby, (*session)->num_players, MAX_NUM_PLAYERS);
+                    // printf("Found player \"%s\" in lobby \"%s\" (%d/%d)\n", name, lobby, (*session)->num_players, MAX_NUM_PLAYERS);
                     return 0;
                 }
             }
@@ -284,7 +412,8 @@ int get_player_session(struct Session** session, struct SessionManager* session_
 
 int format_response(char* response, struct Session* session) {
     struct Player* player;
-    struct Pose* pose;
+    struct Transform* transform;
+    struct Position* position;
     char* ptr;
 
     memset(response, 0, RESPONSE_SIZE);
@@ -304,16 +433,26 @@ int format_response(char* response, struct Session* session) {
         sprintf(ptr, "%s ", player->name);
 
         ptr = &(response[strlen(response)]);
-        pose = &(player->avatar.headset);
-        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f ", pose->pos.x, pose->pos.y, pose->pos.z, pose->quat.x, pose->quat.y, pose->quat.z, pose->quat.w);
+        transform = &(player->avatar.head);
+        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f ", 
+            transform->pos.x, transform->pos.y, transform->pos.z, transform->quat.x, transform->quat.y, transform->quat.z, transform->quat.w);
         
         ptr = &(response[strlen(response)]); 
-        pose = &(player->avatar.left_hand);
-        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f ", pose->pos.x, pose->pos.y, pose->pos.z, pose->quat.x, pose->quat.y, pose->quat.z, pose->quat.w);
+        transform = &(player->avatar.left.transform);
+        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f ", 
+            transform->pos.x, transform->pos.y, transform->pos.z, transform->quat.x, transform->quat.y, transform->quat.z, transform->quat.w);
         
         ptr = &(response[strlen(response)]);  
-        pose = &(player->avatar.right_hand);
-        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %s\n", pose->pos.x, pose->pos.y, pose->pos.z, pose->quat.x, pose->quat.y, pose->quat.z, pose->quat.w, player->timestamp);
+        transform = &(player->avatar.right.transform);
+        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f ", 
+            transform->pos.x, transform->pos.y, transform->pos.z, transform->quat.x, transform->quat.y, transform->quat.z, transform->quat.w);
+
+        ptr = &(response[strlen(response)]);  
+        position = &(player->avatar.offset);
+        sprintf(ptr, "%0.3f %0.3f %0.3f ", position->x, position->y, position->z);
+
+        ptr = &(response[strlen(response)]);  
+        sprintf(ptr, "%s\n", player->ping);
     }
     response[strlen(response) - 1] = '\0';  // remove last newline
     return 0;
@@ -359,18 +498,61 @@ int create_or_join_session(struct SessionManager* session_manager, char* mess, s
     // Create lobby
     session = &(session_manager->sessions[session_manager->num_sessions++]);
     strcpy(session->lobby, lobby);
-    session->sphere.t = 0.05;
-    session->sphere.pos.x = 4 * cos(session->sphere.t * 2 * M_PI);
-    session->sphere.pos.y = sin(session->sphere.t * 2 * M_PI / 16) + 3;
-    session->sphere.pos.z = 4 * sin(session->sphere.t * 2 * M_PI);
+    move_sphere(&session->sphere, 1);
+    session->timestep = session_manager->timestep;
     session->plane.pos.x = session->plane.pos.y = session->plane.pos.z = 0;
+    session->has_changed = 1;
+    session->timeout_sec = DEFAULT_TIMEOUT_SEC;
 
     // Add player to lobby
-    memcpy(&(session->players[session->num_players].addr), addr, sizeof(struct sockaddr_in));
-    strcpy(session->players[session->num_players].name, name);
+    struct Player* player = &session->players[session->num_players]; 
+    memcpy(&(player->addr), addr, sizeof(struct sockaddr_in));
+    strcpy(player->name, name);
+    player->avatar.offset.y = 1.5;  // Make everyone the same height ?
+    gettimeofday(&player->timestamp, NULL);
+
     session->num_players++;
     printf("Player \"%s\" created lobby \"%s\" (%d/%d)\n", name, lobby, session_manager->num_sessions, MAX_NUM_SESSIONS);
     return 0;
+}
+
+int leave_session(struct SessionManager* session_manager, char* mess) {
+    char dummy_type[64];
+    char name[64];
+    char lobby[64];
+    sscanf(mess, "%s %s %s", dummy_type, name, lobby);
+
+    for (int i = 0; i < session_manager->num_sessions; i++) {
+        if (strcmp(lobby, session_manager->sessions[i].lobby) == 0) {
+            for (int j = 0; j < session_manager->sessions[i].num_players; j++) {
+                if (strcmp(session_manager->sessions[i].players[j].name, name) == 0) {
+                    // Player is in session i at index j
+
+                    struct Session* session = &(session_manager->sessions[i]);
+                    for (int k = j; k < session->num_players - 1; k++)
+                        memcpy(&session->players[k], &session->players[k+1], sizeof(struct Player));
+                    memset(&session->players[session->num_players - 1], 0, sizeof(struct Player));
+                    session->num_players--;
+                    session->has_changed = 1;
+                    printf("Player \"%s\" left lobby \"%s\" (%d/%d)\n", name, lobby, session->num_players, MAX_NUM_PLAYERS);
+
+                    if (session->num_players == 0) {
+                        for (int k = i; k < session_manager->num_sessions - 1; k++)
+                            memcpy(&session_manager->sessions[k], &session_manager->sessions[k+1], sizeof(struct Session));
+                        memset(&session_manager->sessions[session_manager->num_sessions - 1], 0, sizeof(struct Session));
+                        session_manager->num_sessions--;
+                        printf("Lobby \"%s\" has been closed\n", lobby);
+                    }
+
+                    return 0;
+                }
+            }
+            printf("Player \"%s\" is not in lobby \"%s\"\n", name, lobby);
+            return 1;
+        }
+    }
+    printf("Lobby \"%s\" does not exist\n", lobby);
+    return 1;
 }
 
 int setup_recv_socket(int* sk, char* ip, char* port) {

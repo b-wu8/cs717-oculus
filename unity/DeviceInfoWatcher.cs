@@ -141,8 +141,10 @@ public class DeviceInfoWatcher : MonoBehaviour
             Debug.Log("Headset pos: " + headset_pos.ToString("F2"));
         // get headset rotation
         Quaternion head_device_rotation = new Quaternion(0.0f, 0.0f, 0.0f, 0.0f);
-        if (head_device.TryGetFeatureValue(CommonUsages.deviceRotation, out head_device_rotation))
+        if (head_device.TryGetFeatureValue(CommonUsages.centerEyeRotation, out head_device_rotation))
             Debug.Log(head_device.name + " rot: " + head_device_rotation.ToString("F2"));
+        //if (head_device.TryGetFeatureValue(CommonUsages.deviceRotation, out head_device_rotation))
+        //    Debug.Log(head_device.name + " rot: " + head_device_rotation.ToString("F2"));
         return new Headset(headset_pos, head_device_rotation);
     }
     public RightJoystick GetRightJoystick()

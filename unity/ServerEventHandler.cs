@@ -30,26 +30,26 @@ public class ServerEventHandler : MonoBehaviour
 {
     public Transform xr_transform;
     public Config config;
-    public PlayerView pv;
+    public PlayerView view;
     private string last_packet;
     public UdpClient client;
     private Vector3 xr_loc;
     private float x, y, z, qx, qy, qz, qw;
     private Thread receive_thread;
-    private int thread_sleep_time = 16;
 
     // todo: delete the debug variable
     public Text debug_display;
     public int num_of_players = 0;
     public string debug_playerinfo;
+    public IPEndPoint server_endpoint;
 
     public void Start()
     {
         client = new UdpClient();
         byte[] temp = Encoding.UTF8.GetBytes(Constants.SYN + " " + config.player_name + " " + config.lobby);
-        IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
-        client.Send(temp, temp.Length, remoteEndPoint);
-        client.Send(temp, temp.Length, remoteEndPoint);
+        server_endpoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
+        client.Send(temp, temp.Length, server_endpoint);
+        client.Send(temp, temp.Length, server_endpoint);
 
         receive_thread = new Thread(new ThreadStart(ReceiveData));
         receive_thread.IsBackground = true;
@@ -64,12 +64,23 @@ public class ServerEventHandler : MonoBehaviour
         GUI.Box(rectObj, "Last Packet: \n" + last_packet, style);
     }
 
+    void OnApplicationQuit()
+    {
+        receive_thread.Abort();
+    }
+
+    public void Send(byte[] data) {
+        if (client == null)
+            return;
+        client.Send(data, data.Length, server_endpoint);
+    }
+
     public void Update()
     {
-        Debug.Log("Last packet: " + last_packet);
+        // Debug.Log("Last packet: " + last_packet);
 
         /*
-        foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in pv.player_infos)
+        foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in view.player_infos)
         {
             Debug.Log("Player name: " + name_2_player_info.Key);
         }
@@ -81,44 +92,67 @@ public class ServerEventHandler : MonoBehaviour
     {
         while (true)
         {
-            IPEndPoint from_addr = new IPEndPoint(IPAddress.Any, 0);
-            byte[] data = client.Receive(ref from_addr);
-            string text = Encoding.UTF8.GetString(data);
-            last_packet = text;
-            string[] lines = text.Split('\n');
+            try {
+                IPEndPoint from_addr = new IPEndPoint(IPAddress.Any, 0);
+                byte[] data = client.Receive(ref from_addr);
+                // Debug.Log("Received message!!!!!!!!!!!!!!!!!!");
+                string text = Encoding.UTF8.GetString(data);
+                last_packet = text;
+                string[] lines = text.Split('\n');
 
-            string[] msg = lines[0].Split(' ');
-            pv.num_players = int.Parse(msg[1]);
-            num_of_players = pv.num_players;
+                string[] msg = lines[0].Split(' ');
+                view.num_players = int.Parse(msg[1]);
+                num_of_players = view.num_players;
 
-            string[] sphere_pieces = lines[1].Split(' ');
-            x = float.Parse(sphere_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
-            y = float.Parse(sphere_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
-            z = float.Parse(sphere_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
-            pv.sphere_loc = new Vector3(x, y, z);
-            
+                string[] sphere_pieces = lines[1].Split(' ');
+                x = float.Parse(sphere_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
+                y = float.Parse(sphere_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
+                z = float.Parse(sphere_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
+                view.sphere_loc = new Vector3(x, y, z);
 
-            string[] plane_pieces = lines[2].Split(' ');
-            x = float.Parse(plane_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
-            y = float.Parse(plane_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
-            z = float.Parse(plane_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
-            pv.plane_loc = new Vector3(x, y, z);
+                string[] plane_pieces = lines[2].Split(' ');
+                x = float.Parse(plane_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
+                y = float.Parse(plane_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
+                z = float.Parse(plane_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
+                view.plane_loc = new Vector3(x, y, z);
 
-            for (int i = 3; i < lines.Length; i++) 
+                for (int i = 3; i < lines.Length; i++) 
+                {
+                    string[] infos = lines[i].Split(' ');
+                    string avatar_name = infos[0];
+                    if (view.avatars.ContainsKey(avatar_name)) {
+                        view.avatars[avatar_name].update(lines[i]);
+                    } else {
+                        view.avatars.Add(avatar_name, new Avatar(config.player_name));
+                        view.avatars[avatar_name].update(lines[i]);
+                    } 
+                }
+            } 
+            catch (Exception e)
             {
-                string[] players = lines[i].Split(' ');
+                Debug.Log("Exception in server handler: " + e);
+            }
+            
+            // System.Threading.Thread.Sleep(config.sleep_ms);
+        }
+    }
+}
+
+
+
+                /*
                 try
                 {
-                    if (pv.player_infos.ContainsKey(players[0]))
+                    if (view.player_infos.ContainsKey(players[0]))
                     {
-                        pv.player_infos[players[0]] = new PlayerInfo(lines[i]);
+                        view.player_infos[players[0]] = new PlayerInfo(lines[i]);
                     } else
                     {
                         //Debug.Log("New player being added");
-                        pv.player_infos.Add(players[0], new PlayerInfo(lines[i])); // add new player
+                        view.player_infos.Add(players[0], new PlayerInfo(lines[i])); // add new player
                     }
 
-                    //PlayerInfo = pv.player_infos[players[0]];
+                    //PlayerInfo = view.player_infos[players[0]];
                     //string[] head_pieces = lines[i].Split(' ');
                     //x = float.Parse(head_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
                     //y = float.Parse(head_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
@@ -135,9 +169,4 @@ public class ServerEventHandler : MonoBehaviour
                 {
                     Debug.Log("Exception in server handler: " + e);
                 }
-                
-            }
-            System.Threading.Thread.Sleep(thread_sleep_time);
-        }
-    }
-}
+                */

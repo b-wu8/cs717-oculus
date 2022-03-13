@@ -5,6 +5,7 @@
 
 using System;
 using UnityEngine;
+using System.Collections.Generic;
 
 /*
  * Types to classify what kind of message is being sent.
@@ -20,7 +21,138 @@ static class Constants
     
     // player formally quits
     public const int FIN = 3;
+
+    public const int HEARTBEAT = 4;
 }
+
+public class Avatar {
+    private string avatar_name, player_name;
+    private Color color;
+    public string timestamp;
+    public Headset headset_controller;
+    public LeftHandController left_controller;
+    public RightHandController right_controller;
+    public Vector3 offset;
+    public GameObject head, left_hand, right_hand;
+    public bool is_created;
+    private List<Color> colors = new List<Color>(new Color[] {
+        Color.magenta, Color.cyan, Color.yellow, Color.green, Color.grey, Color.blue, Color.red});
+    public static int color_idx = 0;
+    public Avatar(string player_name) 
+    {
+        this.offset = new Vector3(0f, 1.5f, 0f);  // Everyone is 1.5 units tall
+        this.color = colors[color_idx++];
+        this.player_name = player_name;
+        this.is_created = false;
+    }
+    
+    public Avatar(Avatar other)
+    {
+        this.avatar_name = other.avatar_name;
+        this.player_name = other.player_name;
+        this.is_created = false;
+        this.headset_controller = (Headset) Headset.deep_copy(other.headset_controller);
+        this.left_controller = (LeftHandController) LeftHandController.deep_copy(other.left_controller);
+        this.right_controller = (RightHandController) RightHandController.deep_copy(other.right_controller);
+    }
+
+    public void update(string server_message)
+    {
+        string[] infos = server_message.Split(' ');
+        this.avatar_name = infos[0];
+        this.headset_controller = new Headset(StringToVec3(infos[1], infos[2], infos[3]), StringToQuat(infos[4], infos[5], infos[6], infos[7]));
+        this.left_controller = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(infos[11], infos[12], infos[13], infos[14]));
+        this.right_controller = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(infos[18], infos[19], infos[20], infos[21]));
+        this.offset = StringToVec3(infos[22], infos[23], infos[24]);
+        this.timestamp = infos[25];
+    }
+    
+    public static Vector3 StringToVec3(string str_x, string str_y, string str_z){
+        return new Vector3(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z));
+    }
+
+    public static Vector2 StringToVec2(string str_x, string str_y){
+        return new Vector2(float.Parse(str_x), float.Parse(str_y));
+    }
+
+    public static Quaternion StringToQuat(string str_x, string str_y, string str_z, string str_w){
+        return new Quaternion(float.Parse(str_x), float.Parse(str_y), float.Parse(str_z), float.Parse(str_w));
+    }
+
+    // REMOVEME: Avatar string never gets sent back
+    public string to_string()
+    {
+        string data = System.String.Empty;
+        data += this.headset_controller.to_string() + " ";
+        data += this.left_controller.to_string() + " ";
+        data += this.right_controller.to_string() + " ";
+        data += this.timestamp;
+        return data;
+    }
+
+    public void create() {
+        if (is_created) {
+            Debug.Log("Avatar already created");
+            return;
+        }
+
+        //Vector3 head_pos = new Vector3(init_pos[0], init_pos[1] + 1.5f, init_pos[2]);
+        //Vector3 left_pos = new Vector3(init_pos[0] - 0.5f, init_pos[1] + 1f, init_pos[2]);
+        //Vector3 right_pos = new Vector3(init_pos[0] + 0.5f, init_pos[1] + 1f, init_pos[2]);
+        // headset_controller.position = new Vector3(2f, 1.5f, 0f);
+
+        head = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        head.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+        head.transform.position = headset_controller.position + offset;
+        head.transform.rotation = headset_controller.rotation;
+        head.GetComponent<Renderer>().material.SetColor("_Color", color);
+        if (player_name == avatar_name)
+            head.SetActive(false);
+
+        left_hand = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        left_hand.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+        left_hand.transform.position = left_controller.position + offset;
+        left_hand.transform.rotation = left_controller.rotation;
+        left_hand.GetComponent<Renderer>().material.SetColor("_Color", color);
+
+        right_hand = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        right_hand.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+        right_hand.transform.position = right_controller.position + offset;
+        right_hand.transform.rotation = right_controller.rotation;
+        right_hand.GetComponent<Renderer>().material.SetColor("_Color", color);
+
+        is_created = true;
+    }
+
+    public void destroy() {
+        if (!is_created) {
+            Debug.Log("No avatar to destroy");
+            return;
+        }
+
+        GameObject.Destroy(head);
+        GameObject.Destroy(left_hand);
+        GameObject.Destroy(right_hand);
+    }
+
+    public void render() {
+        if (!is_created) {
+            create();
+            return;
+        }
+
+        head.transform.position = headset_controller.position + offset;
+        head.transform.rotation = headset_controller.rotation;
+
+        left_hand.transform.position = left_controller.position + offset;
+        left_hand.transform.rotation = left_controller.rotation;
+
+        right_hand.transform.position = right_controller.position + offset;
+        right_hand.transform.rotation = right_controller.rotation;
+    }
+}
+
+/*
 public class PlayerInfo 
 {
     public string name;
@@ -72,6 +204,7 @@ public class PlayerInfo
         return data;
     }
 }
+*/
 
 /*
  * Devices whose data is trackable.
