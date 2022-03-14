@@ -96,11 +96,6 @@ public class Avatar {
             return;
         }
 
-        //Vector3 head_pos = new Vector3(init_pos[0], init_pos[1] + 1.5f, init_pos[2]);
-        //Vector3 left_pos = new Vector3(init_pos[0] - 0.5f, init_pos[1] + 1f, init_pos[2]);
-        //Vector3 right_pos = new Vector3(init_pos[0] + 0.5f, init_pos[1] + 1f, init_pos[2]);
-        // headset_controller.position = new Vector3(2f, 1.5f, 0f);
-
         head = GameObject.CreatePrimitive(PrimitiveType.Cube);
         head.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
         head.transform.position = headset_controller.position + offset;

@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 
                         // Print address we are responding to
                         format_addr(addr_str_buff, addr);
-                        // printf("Responded to %s\n", addr_str_buff);
+                        printf("Responded to %s\n", addr_str_buff);
                     }
                     session->has_changed = 0;
                 }
@@ -243,7 +243,9 @@ int check_timeouts(struct SessionManager* session_manager) {
                 sprintf(removal_messages[num_timeouts++], "%s %s %s", FIN, session->players[j].name, session->lobby);
     }
     
-    for (int i = 0; i < num_timeouts; i++) 
+    if (num_timeouts > 0)
+        printf("%d playeys timed out\n", num_timeouts);
+    for (int i = 0; i < num_timeouts; i++)
         leave_session(session_manager, removal_messages[i]);
     
     return num_timeouts;
@@ -398,7 +400,7 @@ int get_player_session(struct Session** session, struct SessionManager* session_
             for (int j = 0; j < session_manager->sessions[i].num_players; j++) {
                 if (strcmp(session_manager->sessions[i].players[j].name, name) == 0) {
                     *session = &(session_manager->sessions[i]);
-                    // printf("Found player \"%s\" in lobby \"%s\" (%d/%d)\n", name, lobby, (*session)->num_players, MAX_NUM_PLAYERS);
+                    printf("Found player \"%s\" in lobby \"%s\" (%d/%d)\n", name, lobby, (*session)->num_players, MAX_NUM_PLAYERS);
                     return 0;
                 }
             }
@@ -483,6 +485,8 @@ int create_or_join_session(struct SessionManager* session_manager, char* mess, s
             }
             memcpy(&session->players[session->num_players].addr, addr, sizeof(struct sockaddr_in));
             strcpy(session->players[session->num_players].name, name);
+            session->players[session->num_players].avatar.offset.y = 1.5;  // Make everyone the same height ?
+            gettimeofday(&session->players[session->num_players].timestamp, NULL);
             session->num_players++;
             printf("Player \"%s\" joined lobby \"%s\" (%d/%d)\n", name, lobby, session->num_players, MAX_NUM_PLAYERS);
             return 0;
@@ -505,13 +509,12 @@ int create_or_join_session(struct SessionManager* session_manager, char* mess, s
     session->timeout_sec = DEFAULT_TIMEOUT_SEC;
 
     // Add player to lobby
-    struct Player* player = &session->players[session->num_players]; 
+    struct Player* player = &session->players[session->num_players++]; 
     memcpy(&(player->addr), addr, sizeof(struct sockaddr_in));
     strcpy(player->name, name);
     player->avatar.offset.y = 1.5;  // Make everyone the same height ?
     gettimeofday(&player->timestamp, NULL);
 
-    session->num_players++;
     printf("Player \"%s\" created lobby \"%s\" (%d/%d)\n", name, lobby, session_manager->num_sessions, MAX_NUM_SESSIONS);
     return 0;
 }

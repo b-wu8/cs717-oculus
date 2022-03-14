@@ -4,7 +4,7 @@ using System;
 
 public class PlayerView : MonoBehaviour
 {
-    public Transform main_camera_transform;
+    public Transform main_camera_transform, left_controller_transform, right_controller_transform;
     public Dictionary<string, Avatar> avatars;
     public Config config;
     private GameObject sphere, plane, xtemp;
@@ -105,102 +105,9 @@ public class PlayerView : MonoBehaviour
         if (avatars.ContainsKey(config.player_name)) {
             Avatar main_avatar = avatars[config.player_name];
             main_camera_transform.position = main_avatar.headset_controller.position + main_avatar.offset;
+            left_controller_transform.position = main_avatar.left_controller.position + main_avatar.offset;
+            right_controller_transform.position = main_avatar.right_controller.position + main_avatar.offset;
             // main_camera_transform.rotation = main_avatar.headset_controller.rotation;
         }
-
-
-        /*
-        Debug.Log("Current player name : " + config.player_name);
-        Debug.Log("Player number :" + player_infos.Count);
-        Debug.Log("Player sphere position: " + sphere_loc.ToString());
-        //LogLatency();
-
-        foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in player_infos)
-        {
-            string player_name = name_2_player_info.Key;
-
-            PlayerInfo player_info = name_2_player_info.Value;
-
-            if (player_heads.ContainsKey(player_name))
-            {
-                Vector3 head_pos = new Vector3(init_pos[0], init_pos[1] + 1.5f, init_pos[2]);
-                Vector3 left_pos = new Vector3(init_pos[0] - 0.5f, init_pos[1] + 1f, init_pos[2]);
-                Vector3 right_pos = new Vector3(init_pos[0] + 0.5f, init_pos[1] + 1f, init_pos[2]);
-
-                // update head position and rotation
-                player_heads[player_name].transform.position = player_info.headset.position;
-                player_heads[player_name].transform.rotation = player_info.headset.rotation;
-                Debug.Log("Player " + player_name + "head pos:" + player_info.headset.position.ToString());
-
-                // update left hand position and rotation
-                player_lefthands[player_name].transform.position = player_info.left_hand.position;
-                player_lefthands[player_name].transform.rotation = player_info.left_hand.rotation;
-                Debug.Log("Player " + player_name + "lefthand pos:" + player_info.left_hand.position.ToString());
-
-                // update right hand position and rotation
-                player_righthands[player_name].transform.position = player_info.right_hand.position;
-                player_righthands[player_name].transform.rotation = player_info.right_hand.rotation;
-                Debug.Log("Player " + player_name + "righthand pos:" + player_info.left_hand.position.ToString());
-
-                /// I ADDED BELOW
-                // update head position and rotation
-                player_heads[player_name].transform.position = head_pos;
-                player_heads[player_name].transform.rotation = player_info.headset.rotation;
-                Debug.Log("Player " + player_name + "head pos:" + player_info.headset.position.ToString());
-
-                // update left hand position and rotation
-                player_lefthands[player_name].transform.position = left_pos;
-                player_lefthands[player_name].transform.rotation = player_info.left_hand.rotation;
-                Debug.Log("Player " + player_name + "lefthand pos:" + player_info.left_hand.position.ToString());
-
-                // update right hand position and rotation
-                player_righthands[player_name].transform.position = right_pos;
-                player_righthands[player_name].transform.rotation = player_info.right_hand.rotation;
-                Debug.Log("Player " + player_name + "righthand pos:" + player_info.left_hand.position.ToString());
-            }
-            else // new player
-            {
-                Vector3 head_pos = new Vector3(init_pos[0], init_pos[1] + 1.5f, init_pos[2]);
-                Vector3 left_pos = new Vector3(init_pos[0] - 0.5f, init_pos[1] + 1f, init_pos[2]);
-                Vector3 right_pos = new Vector3(init_pos[0] + 0.5f, init_pos[1] + 1f, init_pos[2]);
-
-                // new head
-                player_heads.Add(player_name, GameObject.CreatePrimitive(PrimitiveType.Cube));
-                player_heads[player_name].transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
-                player_heads[player_name].transform.position = init_pos;
-                var head_renderer = player_heads[player_name].GetComponent<Renderer>();
-                head_renderer.material.SetColor("_Color", colors[player_idx % colors.Count]);
-
-                // new left hand
-                player_lefthands.Add(player_name, GameObject.CreatePrimitive(PrimitiveType.Sphere));
-                player_lefthands[player_name].transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
-                player_lefthands[player_name].transform.position = left_pos;
-                var left_renderer = player_lefthands[player_name].GetComponent<Renderer>();
-                left_renderer.material.SetColor("_Color", colors[player_idx % colors.Count]);
-
-                // new right hand
-                player_righthands.Add(player_name, GameObject.CreatePrimitive(PrimitiveType.Sphere));
-                player_righthands[player_name].transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
-                player_righthands[player_name].transform.position = right_pos;
-                var right_renderer = player_righthands[player_name].GetComponent<Renderer>();
-                right_renderer.material.SetColor("_Color", colors[player_idx % colors.Count]);
-
-                // change init values for new player
-                init_pos.x += 1;
-                init_pos.y += 0;
-                init_pos.z += 1;
-                player_idx += 1;
-            }
-            try
-            {
-                // old player
-                
-            } catch (Exception e)
-            {
-                Debug.Log("Exception in player view: " + e);
-            }
-        }
-        
-        */
     }
 }

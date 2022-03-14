@@ -11,24 +11,8 @@ using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine.UI;
 
-struct Player
-{
-    public string name;
-    public string lobby;
-    public GameObject head;
-    public Vector3 head_loc;
-    public Quaternion head_quat;
-    public GameObject right;
-    public Vector3 right_loc;
-    public Quaternion right_quat;
-    public GameObject left;
-    public Vector3 left_loc;
-    public Quaternion left_quat;
-}
-
 public class ServerEventHandler : MonoBehaviour
 {
-    public Transform xr_transform;
     public Config config;
     public PlayerView view;
     private string last_packet;
@@ -73,18 +57,6 @@ public class ServerEventHandler : MonoBehaviour
         if (client == null)
             return;
         client.Send(data, data.Length, server_endpoint);
-    }
-
-    public void Update()
-    {
-        // Debug.Log("Last packet: " + last_packet);
-
-        /*
-        foreach (KeyValuePair<string, PlayerInfo> name_2_player_info in view.player_infos)
-        {
-            Debug.Log("Player name: " + name_2_player_info.Key);
-        }
-        */
     }
 
     // receive thread
@@ -132,41 +104,6 @@ public class ServerEventHandler : MonoBehaviour
             {
                 Debug.Log("Exception in server handler: " + e);
             }
-            
-            // System.Threading.Thread.Sleep(config.sleep_ms);
         }
     }
 }
-
-
-
-                /*
-                try
-                {
-                    if (view.player_infos.ContainsKey(players[0]))
-                    {
-                        view.player_infos[players[0]] = new PlayerInfo(lines[i]);
-                    } else
-                    {
-                        //Debug.Log("New player being added");
-                        view.player_infos.Add(players[0], new PlayerInfo(lines[i])); // add new player
-                    }
-
-                    //PlayerInfo = view.player_infos[players[0]];
-                    //string[] head_pieces = lines[i].Split(' ');
-                    //x = float.Parse(head_pieces[1], CultureInfo.InvariantCulture.NumberFormat);
-                    //y = float.Parse(head_pieces[2], CultureInfo.InvariantCulture.NumberFormat);
-                    //z = float.Parse(head_pieces[3], CultureInfo.InvariantCulture.NumberFormat);
-                    //qx = float.Parse(head_pieces[4], CultureInfo.InvariantCulture.NumberFormat);
-                    //qy = float.Parse(head_pieces[5], CultureInfo.InvariantCulture.NumberFormat);
-                    //qz = float.Parse(head_pieces[6], CultureInfo.InvariantCulture.NumberFormat);
-                    //qw = float.Parse(head_pieces[7], CultureInfo.InvariantCulture.NumberFormat);
-                    //curr_player.headset = new Headset(new Vector3(x, y, z), new Quaternion(qx, qy, qz, qw));
-
-                    // TODO: LH RH   
-                }
-                catch (Exception e)
-                {
-                    Debug.Log("Exception in server handler: " + e);
-                }
-                */
