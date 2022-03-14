@@ -4,7 +4,7 @@ using System;
 
 public class PlayerView : MonoBehaviour
 {
-    public Transform main_camera_transform, left_controller_transform, right_controller_transform;
+    public Transform xr_rig_offset;
     public Dictionary<string, Avatar> avatars;
     public Config config;
     private GameObject sphere, plane, xtemp;
@@ -97,17 +97,28 @@ public class PlayerView : MonoBehaviour
         
         sphere.transform.position = sphere_loc;
         plane.transform.position = plane_loc;
-        
+
+        bool destroyed_avatar = false;;    
         foreach (KeyValuePair<string, Avatar> kv_avatar in avatars) {
-            kv_avatar.Value.render();
+            if (!kv_avatar.Value.to_be_destroyed)
+                kv_avatar.Value.render();
+            else {
+                kv_avatar.Value.destroy();
+                destroyed_avatar = true;
+            }
+        }
+
+        if (destroyed_avatar) {
+            Dictionary<string, Avatar> temp_avatars = new Dictionary<string, Avatar>();
+            foreach (KeyValuePair<string, Avatar> kv_avatar in avatars)
+                if (!kv_avatar.Value.to_be_destroyed)
+                    temp_avatars.Add(kv_avatar.Key, kv_avatar.Value);
+            avatars = temp_avatars;
         }
 
         if (avatars.ContainsKey(config.player_name)) {
             Avatar main_avatar = avatars[config.player_name];
-            main_camera_transform.position = main_avatar.headset_controller.position + main_avatar.offset;
-            left_controller_transform.position = main_avatar.left_controller.position + main_avatar.offset;
-            right_controller_transform.position = main_avatar.right_controller.position + main_avatar.offset;
-            // main_camera_transform.rotation = main_avatar.headset_controller.rotation;
+            xr_rig_offset.position = main_avatar.offset;
         }
     }
 }

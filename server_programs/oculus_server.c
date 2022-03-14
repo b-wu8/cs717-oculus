@@ -28,6 +28,8 @@
 #define INPUT "2" // client update message
 #define FIN "3" // client's explicite exit message
 #define HEARTBEAT "4" // client sends keep-alive message
+#define DATA "5"  // Send regular data
+#define LOBBY "6" // tells clients that someone has left the room
 
 struct Position {
     float x;
@@ -96,6 +98,7 @@ struct SessionManager {
     struct Session sessions[MAX_NUM_SESSIONS];
     int num_sessions;
     double timestep;
+    int sk;
 };
 
 void format_addr(char *buf, struct sockaddr_in* addr);
@@ -146,6 +149,7 @@ int main(int argc, char *argv[])
     struct SessionManager session_manager;
     memset(&session_manager, 0, sizeof(session_manager));
     session_manager.timestep = ((double) timeout_ms) / 1000;
+    session_manager.sk = sk;
     char addr_str_buff[256];
     memset(addr_str_buff, 0, 256);
     char response_buff[RESPONSE_SIZE];
@@ -204,7 +208,7 @@ int main(int argc, char *argv[])
                     // printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
                     for (j = 0; j < session->num_players; j++) {
                         addr = &(session->players[j].addr);
-                        sendto(sk, response_buff, strlen(response_buff) + 1, 0, (struct sockaddr*)addr, sizeof(struct sockaddr_in));
+                        sendto(sk, response_buff, strlen(response_buff), 0, (struct sockaddr*)addr, sizeof(struct sockaddr_in));
 
                         // Print address we are responding to
                         format_addr(addr_str_buff, addr);
@@ -419,7 +423,7 @@ int format_response(char* response, struct Session* session) {
     char* ptr;
 
     memset(response, 0, RESPONSE_SIZE);
-    sprintf(response, "%s %d\n", session->lobby, session->num_players);
+    sprintf(response, "%s %s %d\n", DATA, session->lobby, session->num_players);
 
     // Format sphere data
     ptr = &(response[strlen(response)]);  // point to next writable char in response
@@ -529,8 +533,6 @@ int leave_session(struct SessionManager* session_manager, char* mess) {
         if (strcmp(lobby, session_manager->sessions[i].lobby) == 0) {
             for (int j = 0; j < session_manager->sessions[i].num_players; j++) {
                 if (strcmp(session_manager->sessions[i].players[j].name, name) == 0) {
-                    // Player is in session i at index j
-
                     struct Session* session = &(session_manager->sessions[i]);
                     for (int k = j; k < session->num_players - 1; k++)
                         memcpy(&session->players[k], &session->players[k+1], sizeof(struct Player));
@@ -545,6 +547,18 @@ int leave_session(struct SessionManager* session_manager, char* mess) {
                         memset(&session_manager->sessions[session_manager->num_sessions - 1], 0, sizeof(struct Session));
                         session_manager->num_sessions--;
                         printf("Lobby \"%s\" has been closed\n", lobby);
+                    } else {
+                        char leave_message[256];
+                        char current_message[250];
+                        sprintf(current_message, "%s %s %d", LOBBY, session->lobby, session->num_players);
+                        for (int k = 0; k < session->num_players; k++) {
+                            sprintf(leave_message, "%s %s", current_message, session->players[k].name);
+                            memcpy(current_message, leave_message, 250);
+                        }
+                        printf("MESSAGE: %s\n", leave_message);
+                        for (int k = 0; k < session->num_players; k++) 
+                            sendto(session_manager->sk, leave_message, strlen(leave_message), 0, 
+                                (struct sockaddr*)&session->players[k].addr, sizeof(struct sockaddr_in));
                     }
 
                     return 0;

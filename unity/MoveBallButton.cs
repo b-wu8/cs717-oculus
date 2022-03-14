@@ -10,7 +10,7 @@ using System.Threading;
 public class MoveBallButton : MonoBehaviour
 {
     public Config config;
-    public ServerEventHandler se_handler;
+    public OculusClient oculus_client;
     public string temp_name, temp_lobby, message;
 
     // Start is called before the first frame update
@@ -39,14 +39,14 @@ public class MoveBallButton : MonoBehaviour
                 message = "MESSAGE: player \"" + config.player_name + "\" left lobby \"" + config.lobby + 
                     "\" ... Player \"" + temp_name + "\" joined lobby \"" + temp_lobby;
                 byte[] data = Encoding.UTF8.GetBytes(Constants.FIN + " " + config.player_name + " " + config.lobby);
-                client.Send(data, data.Length, se_handler.server_endpoint);
+                client.Send(data, data.Length, oculus_client.server_endpoint);
 
                 System.Threading.Thread.Sleep(100); // Make sure above message arrives first
 
                 config.lobby = temp_lobby;
                 config.player_name = temp_name;
                 data = Encoding.UTF8.GetBytes(Constants.SYN + " " + config.player_name + " " + config.lobby);
-                se_handler.client.Send(data, data.Length, se_handler.server_endpoint);
+                oculus_client.receive_client.Send(data, data.Length, oculus_client.server_endpoint);
 
                 temp_lobby = "";
                 temp_name = "";

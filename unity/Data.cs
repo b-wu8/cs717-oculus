@@ -15,14 +15,13 @@ static class Constants
     // startup message indicates that a player is trying to connect to room
     // the player name is mapped to the included IP address
     public const int SYN = 1;
-
     // controller input message
     public const int INPUT = 2;
-    
     // player formally quits
     public const int FIN = 3;
-
     public const int HEARTBEAT = 4;
+    public const int DATA = 5;
+    public const int LEAVE = 6;
 }
 
 public class Avatar {
@@ -34,20 +33,22 @@ public class Avatar {
     public RightHandController right_controller;
     public Vector3 offset;
     public GameObject head, left_hand, right_hand;
-    public bool is_created;
+    public bool is_created, to_be_destroyed;
     private List<Color> colors = new List<Color>(new Color[] {
         Color.magenta, Color.cyan, Color.yellow, Color.green, Color.grey, Color.blue, Color.red});
     public static int color_idx = 0;
     public Avatar(string player_name) 
     {
+        Debug.Log("Created new avatar in Avatar(string player_name)");
         this.offset = new Vector3(0f, 1.5f, 0f);  // Everyone is 1.5 units tall
         this.color = colors[color_idx++];
         this.player_name = player_name;
-        this.is_created = false;
+        this.is_created = this.to_be_destroyed = false;
     }
     
     public Avatar(Avatar other)
     {
+        Debug.Log("Created new avatar in Avatar(Avatar other)");
         this.avatar_name = other.avatar_name;
         this.player_name = other.player_name;
         this.is_created = false;
@@ -128,6 +129,7 @@ public class Avatar {
         GameObject.Destroy(head);
         GameObject.Destroy(left_hand);
         GameObject.Destroy(right_hand);
+        Debug.Log("Destroyed avatar for " + avatar_name);
     }
 
     public void render() {
