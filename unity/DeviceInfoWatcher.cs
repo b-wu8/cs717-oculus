@@ -15,9 +15,9 @@ using System.Threading;
 public class DeviceInfoWatcher : MonoBehaviour
 {
     // input devices
-    private InputDevice head_device;
-    private InputDevice right_controller;
-    private InputDevice left_controller;
+    public InputDevice head_device;
+    public InputDevice right_controller;
+    public InputDevice left_controller;
     bool head_connected = false, right_connected = false, left_connected = false;
 
     void OnEnable()
