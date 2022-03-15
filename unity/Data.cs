@@ -106,13 +106,13 @@ public class Avatar {
             head.SetActive(false);
 
         left_hand = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        left_hand.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+        left_hand.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
         left_hand.transform.position = left_controller.position + offset;
         left_hand.transform.rotation = left_controller.rotation;
         left_hand.GetComponent<Renderer>().material.SetColor("_Color", color);
 
         right_hand = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        right_hand.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+        right_hand.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
         right_hand.transform.position = right_controller.position + offset;
         right_hand.transform.rotation = right_controller.rotation;
         right_hand.GetComponent<Renderer>().material.SetColor("_Color", color);

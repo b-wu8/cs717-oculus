@@ -19,6 +19,7 @@ public class OculusClient : MonoBehaviour
     private string last_packet;
     public UdpClient receive_client, heartbeat_client, controller_client;
     private Thread receive_thread, heartbeat_thread, controller_thread;
+    private DateTime ping_start_time;
     public IPEndPoint server_endpoint;
 
     public void Start()
@@ -106,6 +107,12 @@ public class OculusClient : MonoBehaviour
         }
     }
 
+    private void HandleHeartbeatMessage(string message) {
+        DateTime ping_end_time = DateTime.Now;
+        TimeSpan ping_time = ping_end_time.Subtract(ping_start_time);
+        Debug.Log("Ping time: " + ping_time.Milliseconds + " ms");
+    }
+
     private void ReceiveData()
     {
         while (true)
@@ -120,6 +127,8 @@ public class OculusClient : MonoBehaviour
                     HandleDataMessage(message);
                 else if (message_type == Constants.LEAVE)
                     HandleLeaveMessage(message);
+                else if (message_type == Constants.HEARTBEAT)
+                    HandleHeartbeatMessage(message);
                 else 
                     Debug.Log("Error - malformed message: " + message);
 
@@ -136,6 +145,7 @@ public class OculusClient : MonoBehaviour
             System.Threading.Thread.Sleep(config.heartbeat_sleep_ms);
             try 
             {
+                ping_start_time = DateTime.Now;
                 byte[] data = Encoding.UTF8.GetBytes(Constants.HEARTBEAT + " " + config.player_name + " " + config.lobby);
                 heartbeat_client.Send(data, data.Length, server_endpoint);
             }

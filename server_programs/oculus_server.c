@@ -24,12 +24,12 @@
 #define DEFAULT_TIMEOUT_SEC 10  // 10 seconds until player timeout
 #define RESPONSE_SIZE 2048
 
-#define SYN "1" // first message from client
-#define INPUT "2" // client update message
-#define FIN "3" // client's explicite exit message
-#define HEARTBEAT "4" // client sends keep-alive message
-#define DATA "5"  // Send regular data
-#define LOBBY "6" // tells clients that someone has left the room
+#define SYN "1" // client declares his existence and wants to join a room
+#define INPUT "2" // client has new data
+#define FIN "3" // client requests to leave lobby
+#define HEARTBEAT "4" // client heartbeat (also a ping)
+#define DATA "5"  // server response with consistent data
+#define LOBBY "6" // server response to players giving lobby info
 
 struct Position {
     float x;
@@ -108,11 +108,11 @@ int setup_recv_socket(int* sk, char* ip, char* port);
 int create_or_join_session(struct SessionManager* session_manager, char* mess, struct sockaddr_in* addr);
 int format_response(char* response, struct Session* session);
 int get_player_session(struct Session** session, struct SessionManager* session_manager, char* mess);
-int update_player_position(struct Session* session, char* mess);
-int update_player_timestamp(struct Session* session, char* mess);
+int handle_player_input(struct SessionManager* session_manager, char* mess);
+int handle_player_heartbeat(struct SessionManager* session_manager, char* mess);
+int handle_player_leave(struct SessionManager* session_manager, char* mess);
 int check_timeouts(struct SessionManager* session_manager);
 int apply_movement_step(struct Session* session);
-int leave_session(struct SessionManager* session_manager, char* mess);
 void move_sphere(struct Sphere* sphere, int timeout_ms);
 
 int main(int argc, char *argv[])
@@ -184,25 +184,22 @@ int main(int argc, char *argv[])
                     continue;  // We should send back an error response later
 
             if (strncmp(mess, FIN, 1) == 0)  // FIXME
-                if (leave_session(&session_manager, mess) != 0)
+                if (handle_player_leave(&session_manager, mess) != 0)
                     continue;  // We should send back an error response later
 
-            if (get_player_session(&session, &session_manager, mess) != 0)
-                continue;
-
             if (strncmp(mess, INPUT, 1) == 0)
-                if (update_player_position(session, mess) != 0)
+                if (handle_player_input(&session_manager, mess) != 0)
                     continue;
             
             if (strncmp(mess, HEARTBEAT, 1) == 0)
-                if (update_player_timestamp(session, mess) != 0)
+                if (handle_player_heartbeat(&session_manager, mess) != 0)
                     continue;
 
         } else { // timeout
             check_timeouts(&session_manager);
             for (i = 0; i < session_manager.num_sessions; i++) {
                 session = &session_manager.sessions[i];
-                apply_movement_step(session);
+                //apply_movement_step(session);
                 if (session->has_changed) {
                     format_response(response_buff, session);
                     // printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
@@ -250,7 +247,7 @@ int check_timeouts(struct SessionManager* session_manager) {
     if (num_timeouts > 0)
         printf("%d playeys timed out\n", num_timeouts);
     for (int i = 0; i < num_timeouts; i++)
-        leave_session(session_manager, removal_messages[i]);
+        handle_player_leave(session_manager, removal_messages[i]);
     
     return num_timeouts;
 }
@@ -303,27 +300,37 @@ int apply_movement_step(struct Session* session) {
     return 0;
 }
 
-int update_player_timestamp(struct Session* session, char* mess) {
+int handle_player_heartbeat(struct SessionManager* session_manager, char* mess) {
     char dummy_type[64];
     char name[64];
     char dummy_lobby[64];
     sscanf(mess, "%s %s %s", dummy_type, name, dummy_lobby);
 
+    struct Session* session;
+    int ret;
+    if ((ret = get_player_session(&session, session_manager, mess) != 0))
+        return ret;
+
     for (int i = 0; i < session->num_players; i++)
         if (strcmp(session->players[i].name, name) == 0) {
             gettimeofday(&session->players[i].timestamp, NULL);
+            sendto(session_manager->sk, mess, strlen(mess), 0, (struct sockaddr*)&session->players[i].addr, sizeof(struct sockaddr_in));
             return 0;
         }
-
     return 1;
 }
 
-int update_player_position(struct Session* session, char* mess) {
+int handle_player_input(struct SessionManager* session_manager, char* mess) {
     char dummy_type[64];
     char name[64];
     char lobby[64];
     int offset = 3;
     sscanf(mess, "%s %s %s", dummy_type, name, lobby);
+
+    struct Session* session;
+    int ret;
+    if ((ret = get_player_session(&session, session_manager, mess) != 0))
+        return ret;
 
     // Extract numbers from message
     char number_strings[128][32];
@@ -523,7 +530,7 @@ int create_or_join_session(struct SessionManager* session_manager, char* mess, s
     return 0;
 }
 
-int leave_session(struct SessionManager* session_manager, char* mess) {
+int handle_player_leave(struct SessionManager* session_manager, char* mess) {
     char dummy_type[64];
     char name[64];
     char lobby[64];
