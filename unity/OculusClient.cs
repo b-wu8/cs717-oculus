@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine.UI;
+using UnityEngine.XR;
 
 public class OculusClient : MonoBehaviour
 {
@@ -23,6 +24,8 @@ public class OculusClient : MonoBehaviour
     private Thread receive_thread, heartbeat_thread, continuous_input_thread, discrete_input_thread;
     private DateTime ping_start_time;
     public IPEndPoint server_endpoint;
+    private TouchScreenKeyboard overlayKeyboard;
+    public static string inputText = "";
 
     public void Start()
     {
@@ -55,6 +58,10 @@ public class OculusClient : MonoBehaviour
         discrete_input_thread = new Thread(new ThreadStart(SendDiscreteData));
         discrete_input_thread.IsBackground = true;
         discrete_input_thread.Start();
+
+        overlayKeyboard = TouchScreenKeyboard.Open("", TouchScreenKeyboardType.Default);
+        if (overlayKeyboard != null)
+            inputText = overlayKeyboard.text;
     }
 
     void OnGUI()
@@ -68,8 +75,8 @@ public class OculusClient : MonoBehaviour
     void OnApplicationQuit()
     {   
         receive_thread.Abort();
-
-        controller_thread.Abort();
+        continuous_input_thread.Abort();
+        discrete_input_thread.Abort();
 
         byte[] data = Encoding.UTF8.GetBytes(Constants.FIN + " " + config.player_name + " " + config.lobby);
         heartbeat_client.Send(data, data.Length, server_endpoint);
@@ -177,7 +184,7 @@ public class OculusClient : MonoBehaviour
             try {
                 string data = Constants.INPUT + " " + config.player_name + " " + config.lobby + " " + device_watcher.GetControllerData();
                 byte[] bytes = Encoding.UTF8.GetBytes(data);
-                controller_client.Send(bytes, bytes.Length, server_endpoint);
+                continuous_input_client.Send(bytes, bytes.Length, server_endpoint);
             }
             catch (Exception e)
             {
