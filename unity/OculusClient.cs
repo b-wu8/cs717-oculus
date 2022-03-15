@@ -17,8 +17,10 @@ public class OculusClient : MonoBehaviour
     public PlayerView view;
     public DeviceInfoWatcher device_watcher;
     private string last_packet;
-    public UdpClient receive_client, heartbeat_client, controller_client;
-    private Thread receive_thread, heartbeat_thread, controller_thread;
+    private int discrete_timeout_ms;
+    private Dictionary<string, bool> current_discrete_state;
+    public UdpClient receive_client, heartbeat_client, continuous_input_client, discrete_input_client;
+    private Thread receive_thread, heartbeat_thread, continuous_input_thread, discrete_input_thread;
     private DateTime ping_start_time;
     public IPEndPoint server_endpoint;
 
@@ -38,10 +40,21 @@ public class OculusClient : MonoBehaviour
         heartbeat_thread.IsBackground = true;
         heartbeat_thread.Start();
 
-        controller_client = new UdpClient();
-        controller_thread = new Thread(new ThreadStart(SendControllerData));
-        controller_thread.IsBackground = true;
-        controller_thread.Start();
+        continuous_input_client = new UdpClient();
+        continuous_input_thread = new Thread(new ThreadStart(SendContinuousData));
+        continuous_input_thread.IsBackground = true;
+        continuous_input_thread.Start();
+
+        discrete_timeout_ms = 10;
+        current_discrete_state = new Dictionary<string, bool>();
+        current_discrete_state.Add("LeftPrimaryButton", false);
+        current_discrete_state.Add("RightPrimaryButton", false);
+        current_discrete_state.Add("LeftSecondaryButton", false);
+        current_discrete_state.Add("RightSecondaryButton", false);
+        discrete_input_client = new UdpClient();
+        discrete_input_thread = new Thread(new ThreadStart(SendDiscreteData));
+        discrete_input_thread.IsBackground = true;
+        discrete_input_thread.Start();
     }
 
     void OnGUI()
@@ -156,7 +169,7 @@ public class OculusClient : MonoBehaviour
         }
     }
 
-    private void SendControllerData()
+    private void SendContinuousData()
     {
         while (true)
         {
@@ -165,6 +178,28 @@ public class OculusClient : MonoBehaviour
                 string data = Constants.INPUT + " " + config.player_name + " " + config.lobby + " " + device_watcher.GetControllerData();
                 byte[] bytes = Encoding.UTF8.GetBytes(data);
                 controller_client.Send(bytes, bytes.Length, server_endpoint);
+            }
+            catch (Exception e)
+            {
+                Debug.Log("Exception in SendControllerData(): " + e);
+            }
+        }
+    }
+
+    private void SendDiscreteData()
+    {
+        while (true)
+        {
+            System.Threading.Thread.Sleep(discrete_timeout_ms);
+            try {
+                bool new_state = false;
+                if (device_watcher.left_controller.TryGetFeatureValue(CommonUsages.primaryButton, out new_state)) {  // Make sure we get value
+                    if (new_state != current_discrete_state["LeftPrimaryButton"]) {
+                        // trigger event
+                        string message = Constants.DISCRETE + " " + "put whatever you want here :)"; 
+                        current_discrete_state["LeftPrimaryButton"] = new_state;
+                    }
+                }
             }
             catch (Exception e)
             {

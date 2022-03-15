@@ -30,6 +30,7 @@
 #define HEARTBEAT "4" // client heartbeat (also a ping)
 #define DATA "5"  // server response with consistent data
 #define LOBBY "6" // server response to players giving lobby info
+#define DISCRETE "7" 
 
 struct Position {
     float x;
@@ -194,6 +195,9 @@ int main(int argc, char *argv[])
             if (strncmp(mess, HEARTBEAT, 1) == 0)
                 if (handle_player_heartbeat(&session_manager, mess) != 0)
                     continue;
+            
+            if (strncmp(mess, DISCRETE, 1) == 0)
+                printf("%s\n", mess);
 
         } else { // timeout
             check_timeouts(&session_manager);
