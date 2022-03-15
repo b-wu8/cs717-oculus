@@ -75,6 +75,7 @@ public class OculusClient : MonoBehaviour
     void OnApplicationQuit()
     {   
         receive_thread.Abort();
+
         continuous_input_thread.Abort();
         discrete_input_thread.Abort();
 
@@ -199,12 +200,78 @@ public class OculusClient : MonoBehaviour
         {
             System.Threading.Thread.Sleep(discrete_timeout_ms);
             try {
+                // bool new_state = device_watcher.GetLeftPrimaryButton();
                 bool new_state = false;
+                string btn_message;
                 if (device_watcher.left_controller.TryGetFeatureValue(CommonUsages.primaryButton, out new_state)) {  // Make sure we get value
-                    if (new_state != current_discrete_state["LeftPrimaryButton"]) {
+                    if (current_discrete_state["LeftPrimaryButton"] != new_state) {
                         // trigger event
-                        string message = Constants.DISCRETE + " " + "put whatever you want here :)"; 
                         current_discrete_state["LeftPrimaryButton"] = new_state;
+                        
+                        if (new_state) // if button pushed
+                        {
+                            btn_message = Constants.DISCRETE + " " + "left hand primary button pushed :)";
+                        }
+                        else
+                        {
+                            btn_message = Constants.DISCRETE + " " + "left hand primary released";
+                        }
+                        byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+                        discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
+                    }
+                }
+                if (device_watcher.left_controller.TryGetFeatureValue(CommonUsages.secondaryButton, out new_state))
+                {  // Make sure we get value
+                    if (current_discrete_state["LeftSecondaryButton"] != new_state)
+                    {
+                        // trigger event
+                        current_discrete_state["LeftSecondaryButton"] = new_state;
+                        if (new_state) // if button pushed
+                        {
+                            btn_message = Constants.DISCRETE + " " + "left hand secondary button pushed :)";
+                        }
+                        else
+                        {
+                            btn_message = Constants.DISCRETE + " " + "left hand secondary button released :)";
+                        }
+                        byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+                        discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
+                    }
+                }
+                if (device_watcher.right_controller.TryGetFeatureValue(CommonUsages.primaryButton, out new_state))
+                {  // Make sure we get value
+                    if (current_discrete_state["RightPrimaryButton"] != new_state)
+                    {
+                        // trigger event
+                        current_discrete_state["RightPrimaryButton"] = new_state;
+                        if (new_state) // if button pushed
+                        {
+                            btn_message = Constants.DISCRETE + " " + "right hand primary button pushed :)";
+                        }
+                        else
+                        {
+                            btn_message = Constants.DISCRETE + " " + "right hand primary button released :)";
+                        }
+                        byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+                        discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
+                    }
+                }
+                if (device_watcher.right_controller.TryGetFeatureValue(CommonUsages.secondaryButton, out new_state))
+                {  // Make sure we get value
+                    if (current_discrete_state["RightSecondaryButton"] != new_state)
+                    {
+                        // trigger event
+                        current_discrete_state["RightSecondaryButton"] = new_state;
+                        if (new_state) // if button pushed
+                        {
+                            btn_message = Constants.DISCRETE + " " + "right hand secondary button pushed :)";
+                        }
+                        else
+                        {
+                            btn_message = Constants.DISCRETE + " " + "right hand secondary button released :)";
+                        }
+                        byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+                        discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
                     }
                 }
             }

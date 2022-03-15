@@ -11,6 +11,28 @@ using System.Net.Sockets;
 using System.Text;
 using System;
 using System.Threading;
+
+/*
+static class DeviceInput
+{
+    public const string RIGHT_PRIMARY_BUTTON = "RIGHT_PRIMARY_BUTTON";
+    public const string RIGHT_SECOND_BUTTON = "RIGHT_SECOND_BUTTON";
+    public const string LEFT_PRIMARY_BUTTON = "LEFT_PRIMARY_BUTTON";
+    public const string LEFT_SECOND_BUTTON = "LEFT_SECOND_BUTTON";
+
+    public const string RIGHT_CONTROLLER_POSITION = "RIGHT_CONTROLLER_POSITION";
+    public const string RIGHT_CONTROLLER_ROTATION = "RIGHT_CONTROLLER_ROTATION";
+    public const string LEFT_CONTROLLER_POSITION = "LEFT_CONTROLLER_POSITION";
+    public const string LEFT_CONTROLLER_ROTATION = "LEFT_CONTROLLER_ROTATION";
+
+    public const string HEADSET_POSITION = "HEADSET_POSITION";
+    public const string HEADSET_ROTATION = "HEADSET_ROTATION";
+
+    public const string LEFT_JOYSTICK_POSITION = "LEFT_JOYSTICK_POSITION";
+    public const string RIGHT_JOYSTICK_POSITION = "RIGHT_JOYSTICK_POSITION";
+}
+*/
+
 [System.Serializable]
 public class DeviceInfoWatcher : MonoBehaviour
 {
@@ -20,6 +42,8 @@ public class DeviceInfoWatcher : MonoBehaviour
     public InputDevice left_controller;
     bool head_connected = false, right_connected = false, left_connected = false;
 
+    //public Dictionary<string, Func<bool>> boolean_inputs;
+
     void OnEnable()
     {
         List<InputDevice> allDevices = new List<InputDevice>();
@@ -28,6 +52,10 @@ public class DeviceInfoWatcher : MonoBehaviour
             InputDevices_deviceConnected(device);
         InputDevices.deviceConnected += InputDevices_deviceConnected;
         InputDevices.deviceDisconnected += InputDevices_deviceDisconnected;
+
+        //boolean_inputs = new Dictionary<string, Func<bool>>();
+        //boolean_inputs[DeviceInput.RIGHT_PRIMARY_BUTTON] =
+
     }
 
     void OnDisable()
@@ -112,6 +140,152 @@ public class DeviceInfoWatcher : MonoBehaviour
             // Debug.Log("Left controller rot: " + left_controller_rotation.ToString("F2"));
         }
         return new LeftHandController(left_controller_pos, left_controller_rotation);
+    }
+
+    // get head position
+    public Vector3 GetHeadPosition()
+    {
+        Vector3 headset_pos = new Vector3(0.0f, 0.0f, 0.0f);
+
+        if (!head_connected)
+            return headset_pos;
+
+        head_device.TryGetFeatureValue(CommonUsages.centerEyePosition, out headset_pos);
+        return headset_pos;
+    }
+
+    // get head rotation
+    public Quaternion GetHeadRotation()
+    {
+        Quaternion headset_rot = new Quaternion(0.0f, 0.0f, 0.0f, 0.0f);
+
+        if (!head_connected)
+            return headset_rot;
+
+        head_device.TryGetFeatureValue(CommonUsages.centerEyeRotation, out headset_rot);
+        return headset_rot;
+    }
+
+    // get left primary button
+    public bool GetLeftControllerPrimaryButtonPushed()
+    {
+        bool new_state = false;
+
+        if (!left_connected)
+            return new_state;
+
+        left_controller.TryGetFeatureValue(CommonUsages.primaryButton, out new_state);
+        return new_state;
+    }
+
+    // get right primary button
+    public bool GetRightControllerPrimaryButtonPushed()
+    {
+        bool state = false;
+
+        if (!right_connected)
+            return state;
+
+        right_controller.TryGetFeatureValue(CommonUsages.primaryButton, out state);
+        return state;
+    }
+
+    // get right secondary button
+    public bool GetRightControllerSecondaryButtonPushed()
+    {
+        bool state = false;
+
+        if (!right_connected)
+            return state;
+
+        right_controller.TryGetFeatureValue(CommonUsages.secondaryButton, out state);
+        return state;
+    }
+
+    // get left secondary button
+    public bool GetLeftControllerSecondaryButtonPushed()
+    {
+        bool state = false;
+        if (!left_connected)
+            return state;
+
+        left_controller.TryGetFeatureValue(CommonUsages.secondaryButton, out state);
+        return state;
+    }
+
+    // get right controller position
+    public Vector3 GetRightControllerPosition()
+    {
+        Vector3 right_controller_pos = new Vector3(0.0f, 0.0f, 0.0f);
+
+        if (!right_connected)
+            return right_controller_pos;
+
+        right_controller.TryGetFeatureValue(CommonUsages.devicePosition, out right_controller_pos);
+
+        return right_controller_pos;
+    }
+
+    // get left controller position
+    public Vector3 GetLeftControllerPosition()
+    {
+        Vector3 left_controller_pos = new Vector3(0.0f, 0.0f, 0.0f);
+
+        if (!left_connected)
+            return left_controller_pos;
+
+        left_controller.TryGetFeatureValue(CommonUsages.devicePosition, out left_controller_pos);
+        return left_controller_pos;
+    }
+
+    // get right controller rotation
+    public Quaternion GetRightControllerRotation()
+    {
+        Quaternion right_rot = new Quaternion(0.0f, 0.0f, 0.0f, 0.0f);
+
+        if (!right_connected)
+            return right_rot;
+
+        right_controller.TryGetFeatureValue(CommonUsages.deviceRotation, out right_rot);
+        return right_rot;
+    }
+
+    // get left controller rotation
+    public Quaternion GetLeftControllerRotation()
+    {
+        Quaternion left_rot = new Quaternion(0.0f, 0.0f, 0.0f, 0.0f);
+
+        if (!left_connected)
+            return left_rot;
+
+        left_controller.TryGetFeatureValue(CommonUsages.deviceRotation, out left_rot);
+        return left_rot;
+    }
+
+    // get right joystick
+    public Vector2 GetRightJoystickVec2()
+    {
+        Vector2 right_joystick_vec2 = new Vector2(0.0f, 0.0f);
+
+        if (!right_connected)
+        {
+            return right_joystick_vec2;
+        }
+        // get right controller position
+        right_controller.TryGetFeatureValue(CommonUsages.primary2DAxis, out right_joystick_vec2);
+        return right_joystick_vec2;
+    }
+
+    // get left joystick
+    public Vector2 GetLeftJoystickVec2()
+    {
+        Vector2 left_joystick_vec2 = new Vector2(0.0f, 0.0f);
+
+        if (!left_connected)
+            return left_joystick_vec2;
+
+        right_controller.TryGetFeatureValue(CommonUsages.primary2DAxis, out left_joystick_vec2);
+        return left_joystick_vec2;
     }
 
     public RightHandController GetRightHandController()

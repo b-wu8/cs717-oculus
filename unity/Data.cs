@@ -23,6 +23,7 @@ static class Constants
     public const int DATA = 5;
     public const int LEAVE = 6;
     public const int DISCRETE = 7;
+    public const int CONTINUE = 8;
 }
 
 public class Avatar {
