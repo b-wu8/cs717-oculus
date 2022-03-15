@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
             check_timeouts(&session_manager);
             for (i = 0; i < session_manager.num_sessions; i++) {
                 session = &session_manager.sessions[i];
-                //apply_movement_step(session);
+                apply_movement_step(session);
                 if (session->has_changed) {
                     format_response(response_buff, session);
                     // printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
