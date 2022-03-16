@@ -17,27 +17,23 @@
 #include <stdbool.h>
 
 #define SPINES_PORT 8100
-#define MAX_BYTES 100000
+#define MAX_MESS_LEN 2048
 #define MAX_NUM_PLAYERS 16
 #define MAX_NUM_SESSIONS 16
+#define MAX_STRING_LEN 64 
 #define MAX_TOTAL_PLAYERS (MAX_NUM_PLAYERS + MAX_NUM_SESSIONS)
 #define DEFAULT_TIMEOUT_SEC 10  // 10 seconds until player timeout
 #define RESPONSE_SIZE 2048
 
-#define SYN "1" // client declares his existence and wants to join a room
-#define INPUT "2" // client has new data
-#define FIN "3" // client requests to leave lobby
-#define HEARTBEAT "4" // client heartbeat (also a ping)
-#define DATA "5"  // server response with consistent data
-#define LOBBY "6" // server response to players giving lobby info
-#define TEST "7" // client sending test data that we just have to print
-
+// Represents position of unity object as (x,y,z) vector 
 struct Position {
     float x;
     float y;
     float z;
 };
 
+// Represents rotation of unity object as (x,y,z,w) quaternion
+// MAKE SURE QUATERNION FORMAT IS (X,Y,Z,W), NOT (W,X,Y,Z)
 struct Quaternion {
     float x;
     float y;
@@ -45,21 +41,30 @@ struct Quaternion {
     float w;
 };
 
+// Transform is defined as a pair of position and rotation
 struct Transform {
     struct Position pos;
     struct Quaternion quat;
 };
 
+// Controller joystick position represented by (x.y) vector
+// The magnitude of this vector implies how far the stick is moved
 struct Joystick {
     float x;
-    float z;
+    float y;
 };
 
+// Controller is currently a transform and a joystick. 
+// More features will be added to the joystick
 struct Controller {
     struct Transform transform;
     struct Joystick joystick;
 };
 
+// Avatar objects are rendered on each of the clients. One for each
+// player. The head, left, and right are all used to construct the 
+// avatar on the client side. The offset gives the avatars coarse-grained 
+// position in the game. 
 struct Avatar {
     struct Position offset;
     struct Transform head;
@@ -67,25 +72,28 @@ struct Avatar {
     struct Controller right;
 };
 
+// REMOVEME: sphere moving on a fixed path
 struct Sphere {
     float t;
     struct Position pos;
 };
 
+// REMOVEME: plane in fixed location
 struct Plane {
     struct Position pos;
 };
 
 struct Player {
-    char name[64];
+    int id;
+    char name[MAX_STRING_LEN];
+    char client_ping_start[MAX_STRING_LEN];
     struct Avatar avatar;
     struct sockaddr_in addr;
     struct timeval timestamp;
-    char* ping;
 };
 
 struct Session {
-    char lobby[64];
+    char lobby[MAX_STRING_LEN];
     int num_players;
     int has_changed;
     int timeout_sec;
@@ -95,67 +103,87 @@ struct Session {
     struct Plane plane;
 };
 
-struct SessionManager {
+struct Context {
     struct Session sessions[MAX_NUM_SESSIONS];
     int num_sessions;
     double timestep;
     int sk;
 };
 
-void format_addr(char *buf, struct sockaddr_in* addr);
-void format_ip(char *buf, int ip);
-void print_local_addr();
-int setup_recv_socket(int* sk, char* ip, char* port);
-int create_or_join_session(struct SessionManager* session_manager, char* mess, struct sockaddr_in* addr);
+enum Type {
+    UNKNOWN = 0,
+    SYN = 1,
+    INPUT = 2,
+    FIN = 3,
+    HEARTBEAT = 4,
+    DATA = 5,
+    LOBBY = 6,
+    TEST = 7
+};
+
+struct Request {
+    enum Type type;
+    struct sockaddr_in from_addr;
+    int data_len;
+    char player_name[MAX_STRING_LEN];
+    char lobby[MAX_STRING_LEN];
+    char data[MAX_MESS_LEN];
+};
+
+int parse_request(struct Request* request);
 int format_response(char* response, struct Session* session);
-int get_player_session(struct Session** session, struct SessionManager* session_manager, char* mess);
-int handle_player_input(struct SessionManager* session_manager, char* mess);
-int handle_player_heartbeat(struct SessionManager* session_manager, char* mess);
-int handle_player_leave(struct SessionManager* session_manager, char* mess);
-int check_timeouts(struct SessionManager* session_manager);
+int get_player_session(struct Session** session, struct Context* context, struct Request* request);
+int remove_players_if_timeout(struct Context* context);
 int apply_movement_step(struct Session* session);
+
+// setup functions
+int setup_recv_socket(int* sk, char* ip, char* port);
+int setup_timeout(struct timeval* timeout, int* timeout_ms, char* tick_delay_ms);
+
+// request handlers
+int handle_player_join(struct Context* context, struct Request* request);
+int handle_player_input(struct Context* context, struct Request* request);
+int handle_player_heartbeat(struct Context* context, struct Request* request);
+int handle_player_leave(struct Context* context, struct Request* request);
+
+// simplicity functions
 void move_sphere(struct Sphere* sphere, int timeout_ms);
+struct Player* add_player_to_lobby(struct Session* session, struct Request* request);
+struct Session* add_lobby_to_context(struct Context* context, struct Request* request);
+void format_addr(char *buf, struct sockaddr_in* addr);
 
 int main(int argc, char *argv[])
 {
-    int sk;
-    struct sockaddr_in remote_addr;
-    socklen_t remote_len;
+    int sk, timeout_ms;
     struct timeval timeout;
     fd_set mask, temp_mask;
-    char mess[MAX_BYTES];
 
     // Verify command line invocation
     if(argc != 4){
-        printf("Usage: ./oculus_server <ip> <port> <time_step (default=10ms)>\n");
+        printf("Usage: ./oculus_server <ip> <port> <tick_delay_ms>\n");
         exit(1);
     }
 
-    if (setup_recv_socket(&sk, argv[1], argv[2])) {
+    if (setup_recv_socket(&sk, argv[1], argv[2]))
         exit(1);  // Error is printed within setup_recv_socket()
-    }
 
-    int timeout_ms = atoi(argv[3]);
-    if (timeout_ms <= 0) {
-        printf("time_step of %d ms is invalid\n", timeout_ms);
-        exit(1);
-    }
-    timeout.tv_sec = timeout_ms / 1000;
-    timeout.tv_usec = (timeout_ms * 1000) % 1000000;
+    if (setup_timeout(&timeout, &timeout_ms, argv[3]))
+        exit(1);  // Error is printed within setup_timeout()
 
     // Server forloop variables
     struct sockaddr_in* addr;
     struct Session* session;
     struct timeval loop_timeout;
-    struct SessionManager session_manager;
-    memset(&session_manager, 0, sizeof(session_manager));
-    session_manager.timestep = ((double) timeout_ms) / 1000;
-    session_manager.sk = sk;
+    socklen_t dummy_len;
+    struct Request request;
+    memset(&request, 0, sizeof(struct Request));
+    struct Context context;
+    memset(&context, 0, sizeof(struct Context));
+    context.timestep = ((double) timeout_ms) / 1000;
+    context.sk = sk;
     char addr_str_buff[256];
-    memset(addr_str_buff, 0, 256);
     char response_buff[RESPONSE_SIZE];
-    memset(response_buff, 0, RESPONSE_SIZE);
-    int num, bytes, i, j;
+    int num, i, j;
     
     // Create temporary buffers for print outs
     printf("Awaiting messages from Oculus...\n");
@@ -169,52 +197,58 @@ int main(int argc, char *argv[])
         // Receive packet
         temp_mask = mask;
         num = select(FD_SETSIZE, &temp_mask, NULL, NULL, &loop_timeout);
-
         if (num > 0) {  // Received message
-            bytes = recvfrom(sk, mess, sizeof(mess), 0, (struct sockaddr *)&remote_addr, &remote_len);
-            mess[bytes] = 0;  // Ad null-terminator to string (soemtimes this is redundant)
+            // Parse request from input bytes
+            request.data_len = recvfrom(sk, request.data, MAX_MESS_LEN, 
+                0, (struct sockaddr *)&request.from_addr, &dummy_len);
+            parse_request(&request);
 
             // Display that we have received message
-            format_addr(addr_str_buff, &remote_addr);
-            printf("rain1 received %d byte message from %s: %s", bytes, addr_str_buff, mess);
-            if (bytes && mess[bytes - 1] != '\n')
+            format_addr(addr_str_buff, &request.from_addr);
+            printf("received %d byte request from %s: %s", 
+                request.data_len, addr_str_buff, request.data);
+            if (request.data_len && request.data[request.data_len - 1] != '\n')
                 printf("\n");
 
-            if (strncmp(mess, SYN, 1) == 0)  // FIXME
-                if (create_or_join_session(&session_manager, mess, &remote_addr) != 0)
-                    continue;  // We should send back an error response later
-
-            if (strncmp(mess, FIN, 1) == 0)  // FIXME
-                if (handle_player_leave(&session_manager, mess) != 0)
-                    continue;  // We should send back an error response later
-
-            if (strncmp(mess, INPUT, 1) == 0)
-                if (handle_player_input(&session_manager, mess) != 0)
-                    continue;
-            
-            if (strncmp(mess, HEARTBEAT, 1) == 0)
-                if (handle_player_heartbeat(&session_manager, mess) != 0)
-                    continue;
-            
-            if (strncmp(mess, TEST, 1) == 0)
-                printf("%s\n", mess);
+            switch (request.type) {
+                case SYN:
+                    handle_player_join(&context, &request);
+                    break;
+                case FIN:
+                    handle_player_leave(&context, &request);
+                    break;
+                case INPUT:
+                    handle_player_input(&context, &request);
+                    break;
+                case HEARTBEAT:
+                    handle_player_heartbeat(&context, &request);
+                    break;
+                case TEST:
+                    printf("%s\n", request.data);
+                    break;
+                default:
+                    break;
+            }
 
         } else { // timeout
-            check_timeouts(&session_manager);
-            for (i = 0; i < session_manager.num_sessions; i++) {
-                session = &session_manager.sessions[i];
+            remove_players_if_timeout(&context);
+            for (i = 0; i < context.num_sessions; i++) {
+                session = &context.sessions[i];
                 apply_movement_step(session);
                 if (session->has_changed) {
                     format_response(response_buff, session);
-                    // printf("Response (len=%d): %s\n", (int) strlen(response_buff), response_buff);
+                    printf("sending %d byte response to lobby \"%s\": %s\nSent to: ", 
+                        (int) strlen(response_buff), session->lobby, response_buff);
                     for (j = 0; j < session->num_players; j++) {
                         addr = &(session->players[j].addr);
-                        sendto(sk, response_buff, strlen(response_buff), 0, (struct sockaddr*)addr, sizeof(struct sockaddr_in));
+                        sendto(sk, response_buff, strlen(response_buff), 
+                            0, (struct sockaddr*)addr, sizeof(struct sockaddr_in));
 
                         // Print address we are responding to
                         format_addr(addr_str_buff, addr);
-                        printf("Responded to %s\n", addr_str_buff);
+                        printf("%s ", addr_str_buff);
                     }
+                    printf("\n");
                     session->has_changed = 0;
                 }
                 move_sphere(&session->sphere, timeout_ms);
@@ -225,6 +259,14 @@ int main(int argc, char *argv[])
     }
 }
 
+int parse_request(struct Request* request) {
+    request->data[request->data_len] = 0;  // make sure data is ended with null-terminator
+    char type_string[MAX_STRING_LEN];
+    sscanf(request->data, "%s %s %s", type_string, request->player_name, request->lobby);
+    request->type = (enum Type) atoi(type_string);
+    return 0;
+}
+
 void move_sphere(struct Sphere* sphere, int timeout_ms) {
     sphere->t += 2 * M_PI / 15 * timeout_ms / 1000;  // rotate at 15 rev per sec
     sphere->pos.x = 4 * cos(sphere->t);
@@ -232,136 +274,126 @@ void move_sphere(struct Sphere* sphere, int timeout_ms) {
     sphere->pos.z = 4 * sin(sphere->t);
 }
 
-int check_timeouts(struct SessionManager* session_manager) {    
+struct Player* add_player_to_lobby(struct Session* session, struct Request* request) {
+    struct Player* player = &session->players[session->num_players];
+    memcpy(&player->addr, &request->from_addr, sizeof(struct sockaddr_in));
+    strcpy(player->name, request->player_name);
+    player->avatar.offset.y = 1.5;  // Make everyone the same height ?
+    gettimeofday(&player->timestamp, NULL);
+    session->num_players++;
+    printf("Player \"%s\" joined lobby \"%s\" (%d/%d)\n", 
+        request->player_name, request->lobby, session->num_players, MAX_NUM_PLAYERS);
+    return player;
+}
+
+struct Session* add_lobby_to_context(struct Context* context, struct Request* request) {
+    struct Session* session = &(context->sessions[context->num_sessions]);
+    strcpy(session->lobby, request->lobby);
+    move_sphere(&session->sphere, 1);
+    session->timestep = context->timestep;
+    session->plane.pos.x = session->plane.pos.y = session->plane.pos.z = 0;
+    session->has_changed = 1;
+    session->timeout_sec = DEFAULT_TIMEOUT_SEC;
+    context->num_sessions++;
+    printf("Lobby \"%s\" has been created (0/%d)\n", request->lobby, MAX_NUM_PLAYERS);
+    return session;
+}
+
+int remove_players_if_timeout(struct Context* context) {    
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
 
-    char removal_messages[MAX_TOTAL_PLAYERS][128];
-    memset(removal_messages, 0, 16 * 128);
+    struct Request removal_requests[MAX_TOTAL_PLAYERS];
+    memset(removal_requests, 0, sizeof(removal_requests));
     int num_timeouts = 0;
     struct Session* session;
 
-    for (int i = 0; i < session_manager->num_sessions; i++) {
-        session = &session_manager->sessions[i];
+    for (int i = 0; i < context->num_sessions; i++) {
+        session = &context->sessions[i];
         for (int j = 0; j < session->num_players; j++) 
-            if (current_time.tv_sec - session->players[j].timestamp.tv_sec > session->timeout_sec)
-                sprintf(removal_messages[num_timeouts++], "%s %s %s", FIN, session->players[j].name, session->lobby);
+            if (current_time.tv_sec - session->players[j].timestamp.tv_sec > session->timeout_sec) {
+                // Player j in session i has timed out
+                sprintf(removal_requests[num_timeouts].data, "%d %s %s", (int) FIN, session->players[j].name, session->lobby);
+                strcpy(removal_requests[num_timeouts].player_name, session->players[j].name);
+                strcpy(removal_requests[num_timeouts].lobby, session->lobby);
+                removal_requests[num_timeouts].data_len = strlen(removal_requests[num_timeouts].data);
+                num_timeouts++;
+            }
     }
     
     if (num_timeouts > 0)
-        printf("%d playeys timed out\n", num_timeouts);
+        printf("%d players timed out\n", num_timeouts);
     for (int i = 0; i < num_timeouts; i++)
-        handle_player_leave(session_manager, removal_messages[i]);
+        handle_player_leave(context, &removal_requests[i]);
     
     return num_timeouts;
 }
 
-//static int count = 0;
-
 int apply_movement_step(struct Session* session) {
     struct Avatar* avatar;
-
-    // float x_hat, z_hat, hat_mag, w_prime, forward_step, right_step;
     for (int j = 0; j < session->num_players; j++) {
-        avatar = &session->players[j].avatar;
-        /*
-        w_prime = sqrt(1 - pow(avatar->head.quat.w, 2));
-        x_hat = avatar->head.quat.x / w_prime;
-        z_hat = avatar->head.quat.z / w_prime;
-        if (count++ % 10 == 0) {
-            printf("qx = %0.3f  qy = %0.3f  qz = %0.3f  qw = %0.3f\n", avatar->right.transform.quat.x, avatar->right.transform.quat.y, avatar->right.transform.quat.z, avatar->right.transform.quat.w);
-            w_prime = sqrt(1 - pow(avatar->right.transform.quat.w, 2));
-            printf("x  = %0.3f  y  = %0.3f  z  = %0.3f\n", avatar->right.transform.quat.x / w_prime, avatar->right.transform.quat.y / w_prime, avatar->right.transform.quat.z / w_prime);
-            //printf("qx = %0.3f  qy = %0.3f  qz = %0.3f  qw = %0.3f\n", avatar->head.quat.x, avatar->head.quat.y, avatar->head.quat.z, avatar->head.quat.w);
-            //printf("x  = %0.3f  y  = %0.3f  z  = %0.3f\n", x_hat, avatar->head.quat.y / w_prime, z_hat);
-        }
-        hat_mag = sqrt(pow(x_hat, 2) + pow(z_hat, 2));
-        x_hat /= hat_mag;
-        z_hat /= hat_mag;
-        if (isnanf(x_hat) || isinff(x_hat) || isnanf(z_hat) || isinff(z_hat)) {  
-            printf("Couldn't resolve quaternion [x, y, z, w] = [%0.3f, %0.3f, %0.3f, %0.3f]\n",
-                avatar->head.quat.x, avatar->head.quat.y, avatar->head.quat.z, avatar->head.quat.w);
-            continue;
-        }
-        if (fabs(avatar->right.joystick.z) > 0.2) {
-            forward_step = avatar->right.joystick.z * session->timestep;
-            avatar->offset.x += forward_step * x_hat;
-            avatar->offset.z += forward_step * z_hat;
-        }
-        if (fabs(avatar->right.joystick.x) > 0.2) {
-            // Geometric rotation 90 deg clockwise in xz plane
-            right_step = avatar->right.joystick.x * session->timestep;
-            avatar->offset.x += right_step * z_hat;
-            avatar->offset.z += -right_step * x_hat;
-        }
-        */
-       
-        if (fabs(avatar->right.joystick.z) > 0.2)
-            avatar->offset.z += avatar->right.joystick.z * session->timestep;
+        avatar = &session->players[j].avatar;      
+        if (fabs(avatar->right.joystick.y) > 0.2)
+            avatar->offset.z += avatar->right.joystick.y * session->timestep;
         if (fabs(avatar->right.joystick.x) > 0.2) 
             avatar->offset.x += avatar->right.joystick.x * session->timestep;
     }
     return 0;
 }
 
-int handle_player_heartbeat(struct SessionManager* session_manager, char* mess) {
-    char dummy_type[64];
-    char name[64];
-    char dummy_lobby[64];
-    sscanf(mess, "%s %s %s", dummy_type, name, dummy_lobby);
-
+int handle_player_heartbeat(struct Context* context, struct Request* request) {
     struct Session* session;
-    int ret;
-    if ((ret = get_player_session(&session, session_manager, mess) != 0))
+    int ret = get_player_session(&session, context, request);
+    if (ret != 0) 
+        // Couldn't find player
         return ret;
 
     for (int i = 0; i < session->num_players; i++)
-        if (strcmp(session->players[i].name, name) == 0) {
+        if (strcmp(session->players[i].name, request->player_name) == 0) {
             gettimeofday(&session->players[i].timestamp, NULL);
-            sendto(session_manager->sk, mess, strlen(mess), 0, (struct sockaddr*)&session->players[i].addr, sizeof(struct sockaddr_in));
+            sendto(context->sk, request->data, request->data_len, 0, (struct sockaddr*)&session->players[i].addr, sizeof(struct sockaddr_in));
             return 0;
         }
     return 1;
 }
 
-int handle_player_input(struct SessionManager* session_manager, char* mess) {
-    char dummy_type[64];
-    char name[64];
-    char lobby[64];
-    int offset = 3;
-    sscanf(mess, "%s %s %s", dummy_type, name, lobby);
-
+int handle_player_input(struct Context* context, struct Request* request) {
     struct Session* session;
-    int ret;
-    if ((ret = get_player_session(&session, session_manager, mess) != 0))
+    int ret = get_player_session(&session, context, request);
+    if (ret != 0) 
+        // Couldn't find player
         return ret;
 
+    // FIXME: using space separated string aprsing is error-prone !!!!!
+
     // Extract numbers from message
+    // This assumes that all fields are separated by exactly one space !!!!!
     char number_strings[128][32];
     memset(number_strings, 0, 32 * 128);
     int i, j, k;
     i = j = k = 0;
-    int num_chars = strlen(mess);
-    for (k = 0; k < num_chars; k++) {
-        if (mess[k] != ' ') {
-            number_strings[i][j++] = mess[k];
+    int num_chars = strlen(request->data);
+    for (k = 0; k < num_chars; k++)
+        if (request->data[k] != ' ') {
+            number_strings[i][j++] = request->data[k];
         } else {
             j = 0;
             i++;
         }
-    }
-    float numbers[125];  // ignore type, name, lobby
-    for (k = 0; k < 128 - offset; k++) {
+
+    int offset = 3;  // ignore type, name, lobby fields  
+    float numbers[128 - offset];
+    for (k = 0; k < 128 - offset; k++)
         numbers[k] = atof(number_strings[k + offset]);
-    }
 
     int player_idx = -1;
-    for (k = 0; k < session->num_players; k++) {
-        if (strcmp(session->players[k].name, name) == 0) {
+    for (k = 0; k < session->num_players; k++)
+        if (strcmp(session->players[k].name, request->player_name) == 0) {
             player_idx = k;
             break;
         }
-    }
+    if (player_idx == -1)
+        return 3;
 
     struct Player* player = &(session->players[player_idx]);
     player->avatar.head.pos.x = numbers[0];
@@ -389,42 +421,33 @@ int handle_player_input(struct SessionManager* session_manager, char* mess) {
     player->avatar.right.transform.quat.w = numbers[20];
 
     player->avatar.left.joystick.x = numbers[21];
-    player->avatar.left.joystick.z = numbers[22];
+    player->avatar.left.joystick.y = numbers[22];
     player->avatar.right.joystick.x = numbers[23];
-    player->avatar.right.joystick.z = numbers[24];
+    player->avatar.right.joystick.y = numbers[24];
 
-    player->ping = number_strings[25 + offset];
-    
-    /*
-    for (k = 0; k < 16; k++) {
-        printf("%s --- %6.3f\n", number_strings[k+3], numbers[k]);
-    }
-    */
+    strcpy(player->client_ping_start, number_strings[25 + offset]);
 
     return 0;
 }
 
-int get_player_session(struct Session** session, struct SessionManager* session_manager, char* mess) {
-    char dummy_type[64];
-    char name[64];
-    char lobby[64];
-    sscanf(mess, "%s %s %s", dummy_type, name, lobby);
-
-    for (int i = 0; i < session_manager->num_sessions; i++) {
-        if (strcmp(lobby, session_manager->sessions[i].lobby) == 0) {
-            for (int j = 0; j < session_manager->sessions[i].num_players; j++) {
-                if (strcmp(session_manager->sessions[i].players[j].name, name) == 0) {
-                    *session = &(session_manager->sessions[i]);
-                    printf("Found player \"%s\" in lobby \"%s\" (%d/%d)\n", name, lobby, (*session)->num_players, MAX_NUM_PLAYERS);
+int get_player_session(struct Session** session, struct Context* context, struct Request* request) {
+    for (int i = 0; i < context->num_sessions; i++) {
+        if (strcmp(request->lobby, context->sessions[i].lobby) == 0) {
+            for (int j = 0; j < context->sessions[i].num_players; j++) {
+                if (strcmp(request->player_name, context->sessions[i].players[j].name) == 0) {
+                    printf("Found player \"%s\" in lobby \"%s\" (%d/%d)\n", 
+                        request->player_name, request->lobby, context->sessions[i].num_players, MAX_NUM_PLAYERS);
+                    *session = &(context->sessions[i]);
                     return 0;
                 }
             }
-            printf("Player \"%s\" is not in lobby \"%s\"\n", name, lobby);
+            printf("Player \"%s\" is not in lobby \"%s\"\n", request->player_name, request->lobby);
+            *session = &(context->sessions[i]);
             return 1;
         }
     }
-    printf("Lobby \"%s\" does not exist\n", lobby);
-    return 1;
+    printf("Lobby \"%s\" does not exist\n", request->lobby);
+    return 2;
 }
 
 int format_response(char* response, struct Session* session) {
@@ -434,7 +457,7 @@ int format_response(char* response, struct Session* session) {
     char* ptr;
 
     memset(response, 0, RESPONSE_SIZE);
-    sprintf(response, "%s %s %d\n", DATA, session->lobby, session->num_players);
+    sprintf(response, "%d %s %d\n", (int) DATA, session->lobby, session->num_players);
 
     // Format sphere data
     ptr = &(response[strlen(response)]);  // point to next writable char in response
@@ -469,118 +492,89 @@ int format_response(char* response, struct Session* session) {
         sprintf(ptr, "%0.3f %0.3f %0.3f ", position->x, position->y, position->z);
 
         ptr = &(response[strlen(response)]);  
-        sprintf(ptr, "%s\n", player->ping);
+        sprintf(ptr, "%s\n", player->client_ping_start);
     }
     response[strlen(response) - 1] = '\0';  // remove last newline
     return 0;
 }
 
-int create_or_join_session(struct SessionManager* session_manager, char* mess, struct sockaddr_in* addr) {
-    // Parse message
-    char oculus[64];
-    char name[64];
-    char lobby[64];
-    sscanf(mess, "%s %s %s", oculus, name, lobby);
-
+int handle_player_join(struct Context* context, struct Request* request) {
     struct Session* session;
-    for (int i = 0; i < session_manager->num_sessions; i++) {
-        session = &(session_manager->sessions[i]);
-        if (strcmp(lobby, session->lobby) == 0) {
-            for (int j = 0; j < session->num_players; j++) {
-                if (strcmp(name, session->players[j].name) == 0) {
-                    printf("Player \"%s\" is already in lobby \"%s\" (%d/%d)\n", name, lobby, session->num_players, MAX_NUM_PLAYERS);
-                    memcpy(&(session->players[j].addr), addr, sizeof(struct sockaddr_in));  // might have to update address
-                    return 0;
-                }
-            }
-            // Only make it here if we are not in lobby
-            if (session->num_players == MAX_NUM_PLAYERS) {
-                printf("Player \"%s\" cannot join lobby \"%s\" (%d/%d)\n", name, lobby, MAX_NUM_PLAYERS, MAX_NUM_PLAYERS);
-                return 1;
-            }
-            memcpy(&session->players[session->num_players].addr, addr, sizeof(struct sockaddr_in));
-            strcpy(session->players[session->num_players].name, name);
-            session->players[session->num_players].avatar.offset.y = 1.5;  // Make everyone the same height ?
-            gettimeofday(&session->players[session->num_players].timestamp, NULL);
-            session->num_players++;
-            printf("Player \"%s\" joined lobby \"%s\" (%d/%d)\n", name, lobby, session->num_players, MAX_NUM_PLAYERS);
-            return 0;
-        }
-    }
-
-    // Only make it here if no lobby exists with the given name
-    if (session_manager->num_sessions == MAX_NUM_SESSIONS) {
-        printf("Player \"%s\" cannot create lobby \"%s\". Max number of sessions are open (%d/%d)\n", name, lobby, MAX_NUM_SESSIONS, MAX_NUM_SESSIONS);
-        return 2;
-    }
-
-    // Create lobby
-    session = &(session_manager->sessions[session_manager->num_sessions++]);
-    strcpy(session->lobby, lobby);
-    move_sphere(&session->sphere, 1);
-    session->timestep = session_manager->timestep;
-    session->plane.pos.x = session->plane.pos.y = session->plane.pos.z = 0;
-    session->has_changed = 1;
-    session->timeout_sec = DEFAULT_TIMEOUT_SEC;
-
-    // Add player to lobby
-    struct Player* player = &session->players[session->num_players++]; 
-    memcpy(&(player->addr), addr, sizeof(struct sockaddr_in));
-    strcpy(player->name, name);
-    player->avatar.offset.y = 1.5;  // Make everyone the same height ?
-    gettimeofday(&player->timestamp, NULL);
-
-    printf("Player \"%s\" created lobby \"%s\" (%d/%d)\n", name, lobby, session_manager->num_sessions, MAX_NUM_SESSIONS);
-    return 0;
-}
-
-int handle_player_leave(struct SessionManager* session_manager, char* mess) {
-    char dummy_type[64];
-    char name[64];
-    char lobby[64];
-    sscanf(mess, "%s %s %s", dummy_type, name, lobby);
-
-    for (int i = 0; i < session_manager->num_sessions; i++) {
-        if (strcmp(lobby, session_manager->sessions[i].lobby) == 0) {
-            for (int j = 0; j < session_manager->sessions[i].num_players; j++) {
-                if (strcmp(session_manager->sessions[i].players[j].name, name) == 0) {
-                    struct Session* session = &(session_manager->sessions[i]);
-                    for (int k = j; k < session->num_players - 1; k++)
-                        memcpy(&session->players[k], &session->players[k+1], sizeof(struct Player));
-                    memset(&session->players[session->num_players - 1], 0, sizeof(struct Player));
-                    session->num_players--;
-                    session->has_changed = 1;
-                    printf("Player \"%s\" left lobby \"%s\" (%d/%d)\n", name, lobby, session->num_players, MAX_NUM_PLAYERS);
-
-                    if (session->num_players == 0) {
-                        for (int k = i; k < session_manager->num_sessions - 1; k++)
-                            memcpy(&session_manager->sessions[k], &session_manager->sessions[k+1], sizeof(struct Session));
-                        memset(&session_manager->sessions[session_manager->num_sessions - 1], 0, sizeof(struct Session));
-                        session_manager->num_sessions--;
-                        printf("Lobby \"%s\" has been closed\n", lobby);
-                    } else {
-                        char leave_message[256];
-                        char current_message[250];
-                        sprintf(current_message, "%s %s %d", LOBBY, session->lobby, session->num_players);
-                        for (int k = 0; k < session->num_players; k++) {
-                            sprintf(leave_message, "%s %s", current_message, session->players[k].name);
-                            memcpy(current_message, leave_message, 250);
-                        }
-                        printf("MESSAGE: %s\n", leave_message);
-                        for (int k = 0; k < session->num_players; k++) 
-                            sendto(session_manager->sk, leave_message, strlen(leave_message), 0, 
-                                (struct sockaddr*)&session->players[k].addr, sizeof(struct sockaddr_in));
-                    }
-
-                    return 0;
-                }
-            }
-            printf("Player \"%s\" is not in lobby \"%s\"\n", name, lobby);
+    int ret = get_player_session(&session, context, request);
+    if (ret == 0) {
+        // Lobby exists and player is already in that lobby
+        // We might still have to update remote address
+        for (int i = 0; i < session->num_players; i++) 
+            if (strcmp(session->players[i].name, request->player_name) == 0) 
+                memcpy(&session->players[i].addr, &request->from_addr, sizeof(struct sockaddr_in));
+        return 0;
+    } else if (ret == 1) {
+        // Lobby exists, but player is not currently in that lobby
+        if (session->num_players == MAX_NUM_PLAYERS) {
+            printf("Player \"%s\" cannot join lobby \"%s\" (%d/%d)\n", 
+                request->player_name, request->lobby, MAX_NUM_PLAYERS, MAX_NUM_PLAYERS);
             return 1;
         }
+        add_player_to_lobby(session, request);
+        return 0;
+    } else if (ret == 2) {
+        // Lobby doesn't exist so we have to make a new one
+        if (context->num_sessions == MAX_NUM_SESSIONS) {
+            printf("Player \"%s\" cannot create lobby \"%s\". Max number of sessions are open (%d/%d)\n", 
+                request->player_name, request->lobby, MAX_NUM_SESSIONS, MAX_NUM_SESSIONS);
+            return 2;
+        }
+
+        session = add_lobby_to_context(context, request);
+        add_player_to_lobby(session, request);
+        return 0;
     }
-    printf("Lobby \"%s\" does not exist\n", lobby);
-    return 1;
+    return ret;
+}
+
+int handle_player_leave(struct Context* context, struct Request* request) {
+    struct Session* session;
+    int ret = get_player_session(&session, context, request);
+    if (ret != 0)
+        // Couldn't find player or lobby
+        return ret;
+    
+    // Remove player from lobby
+    for (int i = 0; i < session->num_players; i++)
+        if (strcmp(session->players[i].name, request->player_name) == 0)
+            for (int j = i; j < session->num_players - 1; j++)
+                memcpy(&session->players[j], &session->players[j+1], sizeof(struct Player));
+    memset(&session->players[session->num_players - 1], 0, sizeof(struct Player));
+    session->num_players--;
+    session->has_changed = 1;
+    printf("Player \"%s\" left lobby \"%s\" (%d/%d)\n", 
+        request->player_name, request->lobby, session->num_players, MAX_NUM_PLAYERS);
+
+    if (session->num_players == 0) {
+        // If this was the last player, close the session
+        for (int i = 0; i < context->num_sessions; i++)
+            if (strcmp(context->sessions[i].lobby, session->lobby) == 0)
+                for (int j = i; j < context->num_sessions - 1; j++)
+                    memcpy(&context->sessions[j], &context->sessions[j+1], sizeof(struct Session));
+        memset(&context->sessions[context->num_sessions - 1], 0, sizeof(struct Session));
+        context->num_sessions--;
+        printf("Lobby \"%s\" has been closed\n", request->lobby);
+    } else {
+        // Send message to all other players that player has left
+        char leave_message[256];
+        char current_message[250];
+        sprintf(current_message, "%d %s %d", (int) LOBBY, session->lobby, session->num_players);
+        for (int i = 0; i < session->num_players; i++) {
+            sprintf(leave_message, "%s %s", current_message, session->players[i].name);
+            memcpy(current_message, leave_message, 250);
+        }
+        printf("Sending leave messsage: %s\n", leave_message);
+        for (int i = 0; i < session->num_players; i++) 
+            sendto(context->sk, leave_message, strlen(leave_message), 0, 
+                (struct sockaddr*)&session->players[i].addr, sizeof(struct sockaddr_in));
+    }
+
+    return 0;
 }
 
 int setup_recv_socket(int* sk, char* ip, char* port) {
@@ -601,12 +595,12 @@ int setup_recv_socket(int* sk, char* ip, char* port) {
     // loop through all the results and bind to the first we can
     for(p = servinfo; p != NULL; p = p->ai_next) {
         if ((*sk = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-            perror("adv_pong: socket");
+            perror("oculus_server: socket");
             continue;
         }
         if (bind(*sk, p->ai_addr, p->ai_addrlen) == -1) {
             close(*sk);
-            perror("adv_pong: bind for recv socket failed\n");
+            perror("oculus_server: bind for recv socket failed\n");
             continue;
         } else {
             printf("Receiving on %s:%s\n", ip, port);
@@ -614,11 +608,22 @@ int setup_recv_socket(int* sk, char* ip, char* port) {
         break;
     }
     if (p == NULL) {
-        fprintf(stderr, "adv_pong: couldn't open recv socket\n");
+        fprintf(stderr, "oculus_server: couldn't open recv socket\n");
         return 2;
     }
     freeaddrinfo(servinfo);
 
+    return 0;
+}
+
+int setup_timeout(struct timeval* timeout, int* timeout_ms, char* tick_delay_ms) {
+    *timeout_ms = atoi(tick_delay_ms);
+    if (*timeout_ms <= 0) {
+        printf("time_step of %d ms is invalid\n", *timeout_ms);
+        exit(1);
+    }
+    timeout->tv_sec = *timeout_ms / 1000;
+    timeout->tv_usec = (*timeout_ms * 1000) % 1000000;
     return 0;
 }
 
@@ -632,24 +637,4 @@ void format_addr(char *buf, struct sockaddr_in* addr)
     bytes[2] = (ip >> 16) & 0xFF;
     bytes[3] = (ip >> 24) & 0xFF;
     sprintf(buf, "%d.%d.%d.%d:%d", bytes[3], bytes[2], bytes[1], bytes[0], port);
-}
-
-void format_ip(char* buf, int ip)
-{
-    sprintf(buf, "%d.%d.%d.%d", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
-}
-
-void print_local_addr()
-{
-    struct hostent *h_tmp;
-    char local_name[256];
-    char temp[256];
-    int local_ip;
-
-    gethostname(local_name, sizeof(local_name)); // find the host name
-    h_tmp = gethostbyname(local_name);           // find host information
-    memcpy(&local_ip, h_tmp->h_addr, sizeof(local_ip));
-    local_ip = ntohl(local_ip);
-    format_ip(temp, local_ip);
-    printf("Local Host Name: %s (%s)\n", local_name, temp);
 }
