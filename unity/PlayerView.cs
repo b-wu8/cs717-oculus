@@ -80,7 +80,7 @@ public class PlayerView : MonoBehaviour
             xr_rig_offset.position = main_avatar.offset;
         }
 
-        // Display debug canvas
+        // Check if we should change state of debug canvas
         if (display_debug != debug_canvas.activeSelf)
             debug_canvas.SetActive(display_debug);
     }

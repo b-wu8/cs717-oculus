@@ -29,10 +29,10 @@ static class MessageTypes
 
 static class OculusButtons
 {
-    public const string LEFT_PRIMARY_BUTTON = "LeftPrimaryButton";
-    public const string RIGHT_PRIMARY_BUTTON = "RightPrimaryButton";
-    public const string LEFT_SECONDARY_BUTTON = "LeftSecondaryButton";
-    public const string RIGHT_SECODNARY_BUTTON = "RightSecondaryButton";
+    public const string RIGHT_PRIMARY_BUTTON = "RightPrimaryButton";  // A
+    public const string RIGHT_SECODNARY_BUTTON = "RightSecondaryButton";  // B
+    public const string LEFT_PRIMARY_BUTTON = "LeftPrimaryButton";  // X
+    public const string LEFT_SECONDARY_BUTTON = "LeftSecondaryButton";  // Y
 
 }
 
@@ -131,11 +131,13 @@ public class OculusClient : MonoBehaviour
         for (int i = 3; i < lines.Length; i++) 
         {
             string[] infos = lines[i].Split(' ');
-            string avatar_name = infos[0];
+            string avatar_idx = infos[0];
+            string avatar_name = infos[1];
             if (view.avatars.ContainsKey(avatar_name)) {
                 view.avatars[avatar_name].update(lines[i]);
             } else {
-                view.avatars.Add(avatar_name, new Avatar(config.player_name));
+                int idx = Int32.Parse(avatar_idx) % AvatarColors.COLORS.Count;
+                view.avatars.Add(avatar_name, new Avatar(config.player_name, idx));
                 view.avatars[avatar_name].update(lines[i]);
             } 
         }

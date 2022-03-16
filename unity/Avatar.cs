@@ -7,6 +7,23 @@ using System;
 using UnityEngine;
 using System.Collections.Generic;
 
+public static class AvatarColors {
+    public static IReadOnlyList<Color> COLORS = new List<Color>(new Color[] {
+        new Color(0, 255, 255),  // Cyan
+        new Color(0, 128, 255),  // LightBlue
+        new Color(0, 0, 255),  // Blue
+        new Color(128,0,255),  // Purple
+        new Color(225, 0, 255),  // Magenta
+        new Color(255, 0, 128),  // Pink
+        new Color(255, 0, 0),  // Red
+        new Color(255, 128, 0),  // Orange
+        new Color(255, 255, 0),  // Yellow
+        new Color(128, 225, 0),  // Lime
+        new Color(0, 255, 0),  // Green
+        new Color(0, 255, 128)  // Teal
+    });
+}
+
 public class Avatar {
     private string avatar_name, player_name;
     private Color color;
@@ -17,14 +34,12 @@ public class Avatar {
     public Vector3 offset;
     public GameObject head, left_hand, right_hand;
     public bool is_created, to_be_destroyed;
-    private List<Color> colors = new List<Color>(new Color[] {
-        Color.magenta, Color.cyan, Color.yellow, Color.green, Color.grey, Color.blue, Color.red});
-    public static int color_idx = 0;
-    public Avatar(string player_name) 
+
+    public Avatar(string player_name, int color_idx) 
     {
         Debug.Log("Created new avatar in Avatar(string player_name)");
-        this.offset = new Vector3(0f, 1.5f, 0f);  // Everyone is 1.5 units tall
-        this.color = colors[color_idx++];
+        this.offset = new Vector3(0f, 1.5f, 0f);  // TODO: Remove this (offset is set by server)
+        this.color = AvatarColors.COLORS[color_idx % AvatarColors.COLORS.Count];
         this.player_name = player_name;
         this.is_created = this.to_be_destroyed = false;
     }
@@ -43,12 +58,19 @@ public class Avatar {
     public void update(string server_message)
     {
         string[] infos = server_message.Split(' ');
-        this.avatar_name = infos[0];
-        this.headset_controller = new Headset(StringToVec3(infos[1], infos[2], infos[3]), StringToQuat(infos[4], infos[5], infos[6], infos[7]));
-        this.left_controller = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(infos[11], infos[12], infos[13], infos[14]));
-        this.right_controller = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(infos[18], infos[19], infos[20], infos[21]));
-        this.offset = StringToVec3(infos[22], infos[23], infos[24]);
-        this.timestamp = infos[25];
+        int h_len = 2;
+        this.avatar_name = infos[1];
+        this.headset_controller = new Headset(
+            StringToVec3(infos[h_len + 0], infos[h_len + 1], infos[h_len + 2]), 
+            StringToQuat(infos[h_len + 3], infos[h_len + 4], infos[h_len + 5], infos[h_len + 6]));
+        this.left_controller = new LeftHandController(
+            StringToVec3(infos[h_len + 7], infos[h_len + 8], infos[h_len + 9]), 
+            StringToQuat(infos[h_len + 10], infos[h_len + 11], infos[h_len + 12], infos[h_len + 13]));
+        this.right_controller = new RightHandController(
+            StringToVec3(infos[h_len + 14], infos[h_len + 15], infos[h_len + 16]), 
+            StringToQuat(infos[h_len + 17], infos[h_len + 18], infos[h_len + 19], infos[h_len + 20]));
+        this.offset = StringToVec3(infos[h_len + 21], infos[h_len + 22], infos[h_len + 23]);
+        this.timestamp = infos[h_len + 24];
     }
     
     public static Vector3 StringToVec3(string str_x, string str_y, string str_z){

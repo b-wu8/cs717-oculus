@@ -563,7 +563,7 @@ int format_response(char* response, struct Session* session) {
     for (int i = 0; i < session->num_players; i++) {
         player = &(session->players[i]);
         ptr = &(response[strlen(response)]);
-        sprintf(ptr, "%s ", player->name);
+        sprintf(ptr, "%d %s ", player->id, player->name);
 
         ptr = &(response[strlen(response)]);
         transform = &(player->avatar.head);
