@@ -4,6 +4,7 @@ using System.Collections;
 using System;
 using System.Text;
 using System.Net;
+using System.Reflection;
 using System.Net.Sockets;
 using System.Threading;
 using System.Runtime.InteropServices;
@@ -15,21 +16,34 @@ using UnityEngine.XR;
 /*
  * Types to classify what kind of message is being sent.
  */
-static class Constants
+static class MessageTypes
 {
-    // startup message indicates that a player is trying to connect to room
-    // the player name is mapped to the included IP address
     public const int SYN = 1;
-    // controller input message
     public const int INPUT = 2;
-    // player formally quits
     public const int FIN = 3;
     public const int HEARTBEAT = 4;
     public const int DATA = 5;
     public const int LEAVE = 6;
-    public const int DISCRETE = 7;
-    public const int CONTINUE = 8;
+    public const int TEST = 7;
 }
+
+static class OculusButtons
+{
+    public const string LEFT_PRIMARY_BUTTON = "LeftPrimaryButton";
+    public const string RIGHT_PRIMARY_BUTTON = "RightPrimaryButton";
+    public const string LEFT_SECONDARY_BUTTON = "LeftSecondaryButton";
+    public const string RIGHT_SECODNARY_BUTTON = "RightSecondaryButton";
+
+}
+
+/*
+// Event driven code which we no longer use
+public class ButtonEvent : UnityEvent<bool> { }
+private ButtonEvent left_primary_button_event;
+left_primary_button_event = new ButtonEvent();
+left_primary_button_event.AddListener(HandleLeftPrimaryButton);
+left_primary_button_event.Invoke(is_pushed);
+*/
 
 public class OculusClient : MonoBehaviour
 {
@@ -43,13 +57,12 @@ public class OculusClient : MonoBehaviour
     private Thread receive_thread, heartbeat_thread, continuous_input_thread, discrete_input_thread;
     private DateTime ping_start_time;
     public IPEndPoint server_endpoint;
-    private TouchScreenKeyboard overlayKeyboard;
     public static string inputText = "";
 
     public void Start()
     {
         receive_client = new UdpClient();
-        byte[] temp = Encoding.UTF8.GetBytes(Constants.SYN + " " + config.player_name + " " + config.lobby);
+        byte[] temp = Encoding.UTF8.GetBytes(MessageTypes.SYN + " " + config.player_name + " " + config.lobby);
         server_endpoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
         receive_client.Send(temp, temp.Length, server_endpoint);
         receive_client.Send(temp, temp.Length, server_endpoint);
@@ -69,18 +82,13 @@ public class OculusClient : MonoBehaviour
 
         discrete_timeout_ms = 10;
         current_discrete_state = new Dictionary<string, bool>();
-        current_discrete_state.Add("LeftPrimaryButton", false);
-        current_discrete_state.Add("RightPrimaryButton", false);
-        current_discrete_state.Add("LeftSecondaryButton", false);
-        current_discrete_state.Add("RightSecondaryButton", false);
+        // Use reflection to set all discrete state buttons to false
+        foreach (FieldInfo field in typeof(OculusButtons).GetFields()) 
+            current_discrete_state.Add(field.GetValue(null).ToString(), false);        
         discrete_input_client = new UdpClient();
         discrete_input_thread = new Thread(new ThreadStart(SendDiscreteData));
         discrete_input_thread.IsBackground = true;
         discrete_input_thread.Start();
-
-        overlayKeyboard = TouchScreenKeyboard.Open("", TouchScreenKeyboardType.Default);
-        if (overlayKeyboard != null)
-            inputText = overlayKeyboard.text;
     }
 
     void OnGUI()
@@ -98,7 +106,7 @@ public class OculusClient : MonoBehaviour
         continuous_input_thread.Abort();
         discrete_input_thread.Abort();
 
-        byte[] data = Encoding.UTF8.GetBytes(Constants.FIN + " " + config.player_name + " " + config.lobby);
+        byte[] data = Encoding.UTF8.GetBytes(MessageTypes.FIN + " " + config.player_name + " " + config.lobby);
         heartbeat_client.Send(data, data.Length, server_endpoint);
         heartbeat_thread.Abort();
     }
@@ -163,11 +171,11 @@ public class OculusClient : MonoBehaviour
                 string message = Encoding.UTF8.GetString(receive_client.Receive(ref from_endpoint));
                 last_packet = message;
                 int message_type = Int32.Parse(message.Substring(0, message.IndexOf(' ')));
-                if (message_type == Constants.DATA)
+                if (message_type == MessageTypes.DATA)
                     HandleDataMessage(message);
-                else if (message_type == Constants.LEAVE)
+                else if (message_type == MessageTypes.LEAVE)
                     HandleLeaveMessage(message);
-                else if (message_type == Constants.HEARTBEAT)
+                else if (message_type == MessageTypes.HEARTBEAT)
                     HandleHeartbeatMessage(message);
                 else 
                     Debug.Log("Error - malformed message: " + message);
@@ -186,7 +194,7 @@ public class OculusClient : MonoBehaviour
             try 
             {
                 ping_start_time = DateTime.Now;
-                byte[] data = Encoding.UTF8.GetBytes(Constants.HEARTBEAT + " " + config.player_name + " " + config.lobby);
+                byte[] data = Encoding.UTF8.GetBytes(MessageTypes.HEARTBEAT + " " + config.player_name + " " + config.lobby);
                 heartbeat_client.Send(data, data.Length, server_endpoint);
             }
             catch (Exception e)
@@ -202,7 +210,7 @@ public class OculusClient : MonoBehaviour
         {
             System.Threading.Thread.Sleep(config.controller_sleep_ms);
             try {
-                string data = Constants.INPUT + " " + config.player_name + " " + config.lobby + " " + device_watcher.GetControllerData();
+                string data = MessageTypes.INPUT + " " + config.player_name + " " + config.lobby + " " + device_watcher.GetControllerData();
                 byte[] bytes = Encoding.UTF8.GetBytes(data);
                 continuous_input_client.Send(bytes, bytes.Length, server_endpoint);
             }
@@ -219,80 +227,70 @@ public class OculusClient : MonoBehaviour
         {
             System.Threading.Thread.Sleep(discrete_timeout_ms);
             try {
-                //if left controller primary button pushed, send to send right away
-                bool new_state = device_watcher.GetLeftControllerPrimaryButtonPushed();
-                string btn_message;
-                if (current_discrete_state["LeftPrimaryButton"] != new_state)
-                {
-                    current_discrete_state["LeftPrimaryButton"] = new_state;
-                    if (new_state) // if button pushed
-                    {
-                        btn_message = Constants.DISCRETE + " " + "left hand primary button pushed :)";
-                    }
-                    else
-                    {
-                        btn_message = Constants.DISCRETE + " " + "left hand primary released";
-                    }
-                    byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
-                    discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
-                }
+                bool is_pushed = device_watcher.GetLeftControllerPrimaryButtonPushed();
+                if (current_discrete_state[OculusButtons.LEFT_PRIMARY_BUTTON] != is_pushed)
+                    HandleLeftPrimaryButtonEvent(is_pushed);
+                
+                is_pushed = device_watcher.GetRightControllerPrimaryButtonPushed();
+                if (current_discrete_state[OculusButtons.RIGHT_PRIMARY_BUTTON] != is_pushed)
+                    HandleRightPrimaryButtonEvent(is_pushed);
 
-                //if left controller secondary button pushed, send to send right away
-                new_state = device_watcher.GetLeftControllerSecondaryButtonPushed();
-                if (current_discrete_state["LeftSecondaryButton"] != new_state)
-                {
-                    // trigger event
-                    current_discrete_state["LeftSecondaryButton"] = new_state;
-                    if (new_state) // if button pushed
-                    {
-                        btn_message = Constants.DISCRETE + " " + "left hand secondary button pushed :)";
-                    }
-                    else
-                    {
-                        btn_message = Constants.DISCRETE + " " + "left hand secondary button released :)";
-                    }
-                    byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
-                    discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
-                }
-
-                new_state = device_watcher.GetRightControllerPrimaryButtonPushed();
-                if (current_discrete_state["RightPrimaryButton"] != new_state)
-                {
-                    // trigger event
-                    current_discrete_state["RightPrimaryButton"] = new_state;
-                    if (new_state) // if button pushed
-                    {
-                        btn_message = Constants.DISCRETE + " " + "right hand primary button pushed :)";
-                    }
-                    else
-                    {
-                        btn_message = Constants.DISCRETE + " " + "right hand primary button released :)";
-                    }
-                    byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
-                    discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
-                }
-
-                new_state = device_watcher.GetRightControllerSecondaryButtonPushed();
-                if (current_discrete_state["RightSecondaryButton"] != new_state)
-                {
-                    // trigger event
-                    current_discrete_state["RightSecondaryButton"] = new_state;
-                    if (new_state) // if button pushed
-                    {
-                        btn_message = Constants.DISCRETE + " " + "right hand secondary button pushed :)";
-                    }
-                    else
-                    {
-                        btn_message = Constants.DISCRETE + " " + "right hand secondary button released :)";
-                    }
-                    byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
-                    discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
-                }
+                is_pushed = device_watcher.GetLeftControllerSecondaryButtonPushed();
+                if (current_discrete_state[OculusButtons.LEFT_SECONDARY_BUTTON] != is_pushed)
+                    HandleLeftSecondaryButtonEvent(is_pushed);
+                
+                is_pushed = device_watcher.GetRightControllerSecondaryButtonPushed();
+                if (current_discrete_state[OculusButtons.RIGHT_SECODNARY_BUTTON] != is_pushed)
+                    HandleRightSecondaryButtonEvent(is_pushed);
             }
             catch (Exception e)
             {
                 Debug.Log("Exception in SendControllerData(): " + e);
             }
         }
+    }
+
+    private void HandleLeftPrimaryButtonEvent(bool is_pushed) {
+        string btn_message;
+        current_discrete_state[OculusButtons.LEFT_PRIMARY_BUTTON] = is_pushed;
+        if (is_pushed) // if button pushed
+            btn_message = MessageTypes.TEST + " " + "left hand primary button pushed :)";
+        else
+            btn_message = MessageTypes.TEST + " " + "left hand primary released";
+        byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+        discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
+    }
+
+    private void HandleRightPrimaryButtonEvent(bool is_pushed) {
+        string btn_message;
+        current_discrete_state[OculusButtons.RIGHT_PRIMARY_BUTTON] = is_pushed;
+        if (is_pushed) // if button pushed
+            btn_message = MessageTypes.TEST + " " + "right hand primary button pushed :)";
+        else
+            btn_message = MessageTypes.TEST + " " + "right hand primary released";
+        byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+        discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
+    }
+
+    private void HandleLeftSecondaryButtonEvent(bool is_pushed) {
+        string btn_message;
+        current_discrete_state[OculusButtons.LEFT_SECONDARY_BUTTON] = is_pushed;
+        if (is_pushed) // if button pushed
+            btn_message = MessageTypes.TEST + " " + "left hand secondary button pushed :)";
+        else
+            btn_message = MessageTypes.TEST + " " + "left hand secondary released";
+        byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+        discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
+    }
+
+    private void HandleRightSecondaryButtonEvent(bool is_pushed) {
+        string btn_message;
+        current_discrete_state[OculusButtons.RIGHT_SECODNARY_BUTTON] = is_pushed;
+        if (is_pushed) // if button pushed
+            btn_message = MessageTypes.TEST + " " + "right hand secondary button pushed :)";
+        else
+            btn_message = MessageTypes.TEST + " " + "right hand secondary released";
+        byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+        discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
     }
 }

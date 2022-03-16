@@ -38,14 +38,14 @@ public class MoveBallButton : MonoBehaviour
             } else {
                 message = "MESSAGE: player \"" + config.player_name + "\" left lobby \"" + config.lobby + 
                     "\" ... Player \"" + temp_name + "\" joined lobby \"" + temp_lobby;
-                byte[] data = Encoding.UTF8.GetBytes(Constants.FIN + " " + config.player_name + " " + config.lobby);
+                byte[] data = Encoding.UTF8.GetBytes(MessageTypes.FIN + " " + config.player_name + " " + config.lobby);
                 client.Send(data, data.Length, oculus_client.server_endpoint);
 
                 System.Threading.Thread.Sleep(100); // Make sure above message arrives first
 
                 config.lobby = temp_lobby;
                 config.player_name = temp_name;
-                data = Encoding.UTF8.GetBytes(Constants.SYN + " " + config.player_name + " " + config.lobby);
+                data = Encoding.UTF8.GetBytes(MessageTypes.SYN + " " + config.player_name + " " + config.lobby);
                 oculus_client.receive_client.Send(data, data.Length, oculus_client.server_endpoint);
 
                 temp_lobby = "";

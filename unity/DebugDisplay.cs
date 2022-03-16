@@ -9,13 +9,14 @@ using UnityEngine.UI;
 
 public class DebugDisplay : MonoBehaviour
 {
-    Dictionary<string, string> debugLogs = new Dictionary<string, string>();
-    string displayText = "";
+    Dictionary<string, string> debug_logs = new Dictionary<string, string>();
+    string display_text = "";
     public string stack = "";
     public Text display;
      
     void OnEnable() {
         Application.logMessageReceivedThreaded += HandleLog;
+        display.fontSize = 18;
     }
     void OnDisable(){
         Application.logMessageReceivedThreaded  -= HandleLog;
@@ -23,56 +24,46 @@ public class DebugDisplay : MonoBehaviour
 
     public void FixedUpdate()
     {
-        display.text = displayText;
+        display.text = display_text;
     }
 
-    void HandleLog(string logString, string stackTrace, LogType type){
+    void HandleLog(string logString, string stack_trace, LogType type){
         if(type == LogType.Log) {
             string[] splitString = logString.Split(char.Parse(":"));
-            string debugKey = splitString[0];
-            string debugValue = splitString.Length > 1 ? splitString[1] : "";
+            string debug_key = splitString[0];
+            string debug_value = splitString.Length > 1 ? splitString[1] : "";
 
-            if(debugLogs.ContainsKey(debugKey)){
-                debugLogs[debugKey] = debugValue;
-            } else {
-                debugLogs.Add(debugKey, debugValue);
-            }
+            if(debug_logs.ContainsKey(debug_key))
+                debug_logs[debug_key] = debug_value;
+            else
+                debug_logs.Add(debug_key, debug_value);
         }
 
         if(type == LogType.Exception)
         {
             string[] splitString = logString.Split(char.Parse(":"));
-            string debugKey = splitString[0];
-            string debugValue = splitString.Length > 1 ? splitString[1] : "";
+            string debug_key = splitString[0];
+            string debug_value = splitString.Length > 1 ? splitString[1] : "";
 
-            if (debugLogs.ContainsKey(debugKey))
-            {
-                debugLogs[debugKey] = debugValue;
-            }
+            if (debug_logs.ContainsKey(debug_key))
+                debug_logs[debug_key] = debug_value;
             else
-            {
-                debugLogs.Add(debugKey, debugValue);
-            }
+                debug_logs.Add(debug_key, debug_value);
 
 
-            if (debugLogs.ContainsKey("Stack"))
-            {
-                debugLogs[debugKey] = stackTrace;
-            }
+            if (debug_logs.ContainsKey("Stack"))
+                debug_logs[debug_key] = stack_trace;
             else
-            {
-                debugLogs.Add("Stack", stackTrace);
-            }
+                debug_logs.Add("Stack", stack_trace);
         }
 
-        displayText = "";
-
-        Dictionary<string, string> debug_log_copy = new Dictionary<string, string>(debugLogs);
+        display_text = "";
+        Dictionary<string, string> debug_log_copy = new Dictionary<string, string>(debug_logs);
         foreach (KeyValuePair<string, string> log in debug_log_copy) {
             if(log.Value == "") 
-                displayText += log.Key + "\n";
+                display_text += log.Key + "\n";
             else
-                displayText += log.Key + ": " + log.Value + "\n";
+                display_text += log.Key + ": " + log.Value + "\n";
         }
         
     }
