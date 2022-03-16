@@ -11,6 +11,7 @@ using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine.UI;
 using UnityEngine.XR;
+using Google.Protobuf;
 
 public class OculusClient : MonoBehaviour
 {
@@ -30,7 +31,8 @@ public class OculusClient : MonoBehaviour
     public void Start()
     {
         receive_client = new UdpClient();
-        byte[] temp = Encoding.UTF8.GetBytes(Constants.SYN + " " + config.player_name + " " + config.lobby);
+        ADS.Request init_request = new ADS.Request { Type = ADS.Request.Types.Type.Syn, Player = new ADS.Player { PlayerName = config.player_name }, LobbyName = config.lobby };
+        byte[] temp = init_request.ToByteArray();
         server_endpoint = new IPEndPoint(IPAddress.Parse(config.remote_ip_address), config.remote_port);
         receive_client.Send(temp, temp.Length, server_endpoint);
         receive_client.Send(temp, temp.Length, server_endpoint);
@@ -79,56 +81,51 @@ public class OculusClient : MonoBehaviour
         continuous_input_thread.Abort();
         discrete_input_thread.Abort();
 
-        byte[] data = Encoding.UTF8.GetBytes(Constants.FIN + " " + config.player_name + " " + config.lobby);
+        byte[] data = new ADS.Request{ Type = ADS.Request.Types.Type.Fin, Player = new ADS.Player { PlayerName = config.player_name }, LobbyName = config.lobby}.ToByteArray();
         heartbeat_client.Send(data, data.Length, server_endpoint);
         heartbeat_thread.Abort();
     }
 
-    private void HandleDataMessage(string message) {
-        string[] lines = message.Split('\n');
-        string[] msg = lines[0].Split(' ');
-        view.num_players = int.Parse(msg[2]);
+    private void HandleDataMessage(ADS.Response response) {
+        view.num_players = response.Players.Count;
 
-        string[] sphere_pieces = lines[1].Split(' ');
         view.sphere_loc = new Vector3(
-            float.Parse(sphere_pieces[1], CultureInfo.InvariantCulture.NumberFormat), 
-            float.Parse(sphere_pieces[2], CultureInfo.InvariantCulture.NumberFormat), 
-            float.Parse(sphere_pieces[3], CultureInfo.InvariantCulture.NumberFormat));
+            response.Sphere.Position.X,
+            response.Sphere.Position.Y,
+            response.Sphere.Position.Z);
 
-        string[] plane_pieces = lines[2].Split(' ');
         view.plane_loc = new Vector3(
-            float.Parse(plane_pieces[1], CultureInfo.InvariantCulture.NumberFormat), 
-            float.Parse(plane_pieces[2], CultureInfo.InvariantCulture.NumberFormat), 
-            float.Parse(plane_pieces[3], CultureInfo.InvariantCulture.NumberFormat));
+            response.Plane.Position.X,
+            response.Plane.Position.Y,
+            response.Plane.Position.Z);
 
-        for (int i = 3; i < lines.Length; i++) 
+        for (int i = 0; i < response.Players.Count; i++) 
         {
-            string[] infos = lines[i].Split(' ');
-            string avatar_name = infos[0];
+            string avatar_name = response.Players[i].PlayerName;
             if (view.avatars.ContainsKey(avatar_name)) {
-                view.avatars[avatar_name].update(lines[i]);
+                view.avatars[avatar_name].update(response.Players[i]);
             } else {
                 view.avatars.Add(avatar_name, new Avatar(config.player_name));
-                view.avatars[avatar_name].update(lines[i]);
+                view.avatars[avatar_name].update(response.Players[i]);
             } 
         }
     }
 
-    private void HandleLeaveMessage(string message) {
-        List<string> msg = new List<string>(message.Split(' '));
-        int num_players = int.Parse(msg[2]);
-        List<string> players = msg.GetRange(3, num_players);
-        Debug.Log(string.Join( ", ", msg.ToArray()));
-        Debug.Log(string.Join( ", ", players.ToArray()));
-        foreach (KeyValuePair<string, Avatar> kv_avatar in view.avatars) {
-            if (!players.Contains(kv_avatar.Key)) {
-                kv_avatar.Value.to_be_destroyed = true;
-                Debug.Log("Marked " + kv_avatar.Key + " for destruction");
+    private void HandleLeaveMessage(ADS.Response response) {
+        int num_players = response.Players.Count;
+
+        for(int i = 0; i < num_players; i++)
+        {
+            string player_name = response.Players[i].PlayerName;
+            if (view.avatars.ContainsKey(player_name))
+            {
+                view.avatars[player_name].to_be_destroyed = true;
+                Debug.Log("Marked " + player_name + " for destruction");
             }
         }
     }
 
-    private void HandleHeartbeatMessage(string message) {
+    private void HandleHeartbeatMessage() {
         DateTime ping_end_time = DateTime.Now;
         TimeSpan ping_time = ping_end_time.Subtract(ping_start_time);
         Debug.Log("Ping time: " + ping_time.Milliseconds + " ms");
@@ -141,15 +138,22 @@ public class OculusClient : MonoBehaviour
             try 
             {
                 IPEndPoint from_endpoint = new IPEndPoint(IPAddress.Any, 0);
-                string message = Encoding.UTF8.GetString(receive_client.Receive(ref from_endpoint));
+
+                byte[] received_data_bytes = receive_client.Receive(ref from_endpoint);
+
+                ADS.Response response = new ADS.Response();
+
+                response = ADS.Response.Parser.ParseFrom(received_data_bytes);
+
+                string message = Encoding.UTF8.GetString(received_data_bytes);
                 last_packet = message;
-                int message_type = Int32.Parse(message.Substring(0, message.IndexOf(' ')));
-                if (message_type == Constants.DATA)
-                    HandleDataMessage(message);
-                else if (message_type == Constants.LEAVE)
-                    HandleLeaveMessage(message);
-                else if (message_type == Constants.HEARTBEAT)
-                    HandleHeartbeatMessage(message);
+
+                if (ADS.Response.Types.Type.Data.Equals(response.GetType()))
+                    HandleDataMessage(response);
+                else if (ADS.Response.Types.Type.Lobby.Equals(response.GetType()))
+                    HandleLeaveMessage(response);
+                else if (ADS.Response.Types.Type.Heartbeat.Equals(response.GetType()))
+                    HandleHeartbeatMessage();
                 else 
                     Debug.Log("Error - malformed message: " + message);
 
@@ -167,7 +171,67 @@ public class OculusClient : MonoBehaviour
             try 
             {
                 ping_start_time = DateTime.Now;
-                byte[] data = Encoding.UTF8.GetBytes(Constants.HEARTBEAT + " " + config.player_name + " " + config.lobby);
+
+                //protobuf serialization
+                Vector3 head_pos = device_watcher.GetHeadPosition();
+                Quaternion head_rot = device_watcher.GetHeadRotation();
+                Vector3 right_controller_pos = device_watcher.GetRightControllerPosition();
+                Quaternion right_controller_rot = device_watcher.GetRightControllerRotation();
+                Vector3 left_controller_pos = device_watcher.GetLeftControllerPosition();
+                Quaternion left_controller_rot = device_watcher.GetLeftControllerRotation();
+                Vector2 right_joystick = device_watcher.GetRightJoystickVec2();
+                Vector2 left_joystick = device_watcher.GetLeftJoystickVec2();
+                ADS.Request request = new ADS.Request
+                {
+                    LobbyName = config.lobby,
+                    Type = ADS.Request.Types.Type.Heartbeat,
+                    Player = new ADS.Player
+                    {
+                        PlayerName = config.player_name,
+                        Headset = new ADS.DeviceInfo {
+                            Position = new ADS.Position
+                            {
+                                X = head_pos.x,
+                                Y = head_pos.y,
+                                Z = head_pos.z
+                            },
+                            Rotation = new ADS.Rotation
+                            {
+                                X = head_rot.x,
+                                Y = head_rot.y,
+                                Z = head_rot.z,
+                                W = head_rot.w
+                            }
+                        },
+                        RightController = new ADS.DeviceInfo
+                        {
+                            Position = new ADS.Position
+                            {
+                                X = left_controller_pos.x,
+                                Y = left_controller_pos.y,
+                                Z = left_controller_pos.z
+                            },
+                            Rotation = new ADS.Rotation
+                            {
+                                X = left_controller_rot.x,
+                                Y = left_controller_rot.y,
+                                Z = left_controller_rot.z,
+                                W = left_controller_rot.w
+                            }
+                        },
+                        RightJoystick = new ADS.Vector2
+                        {
+                            X = right_joystick.x,
+                            Y = right_joystick.y
+                        },
+                        LeftJoystick = new ADS.Vector2
+                        {
+                            X = left_joystick.x,
+                            Y = left_joystick.y
+                        }
+                    }
+                };
+                byte[] data = request.ToByteArray();
                 heartbeat_client.Send(data, data.Length, server_endpoint);
             }
             catch (Exception e)
@@ -183,9 +247,68 @@ public class OculusClient : MonoBehaviour
         {
             System.Threading.Thread.Sleep(config.controller_sleep_ms);
             try {
-                string data = Constants.INPUT + " " + config.player_name + " " + config.lobby + " " + device_watcher.GetControllerData();
-                byte[] bytes = Encoding.UTF8.GetBytes(data);
-                continuous_input_client.Send(bytes, bytes.Length, server_endpoint);
+                //protobuf serialization
+                Vector3 head_pos = device_watcher.GetHeadPosition();
+                Quaternion head_rot = device_watcher.GetHeadRotation();
+                Vector3 right_controller_pos = device_watcher.GetRightControllerPosition();
+                Quaternion right_controller_rot = device_watcher.GetRightControllerRotation();
+                Vector3 left_controller_pos = device_watcher.GetLeftControllerPosition();
+                Quaternion left_controller_rot = device_watcher.GetLeftControllerRotation();
+                Vector2 right_joystick = device_watcher.GetRightJoystickVec2();
+                Vector2 left_joystick = device_watcher.GetLeftJoystickVec2();
+                ADS.Request request = new ADS.Request
+                {
+                    LobbyName = config.lobby,
+                    Type = ADS.Request.Types.Type.Heartbeat,
+                    Player = new ADS.Player
+                    {
+                        PlayerName = config.player_name,
+                        Headset = new ADS.DeviceInfo
+                        {
+                            Position = new ADS.Position
+                            {
+                                X = head_pos.x,
+                                Y = head_pos.y,
+                                Z = head_pos.z
+                            },
+                            Rotation = new ADS.Rotation
+                            {
+                                X = head_rot.x,
+                                Y = head_rot.y,
+                                Z = head_rot.z,
+                                W = head_rot.w
+                            }
+                        },
+                        RightController = new ADS.DeviceInfo
+                        {
+                            Position = new ADS.Position
+                            {
+                                X = left_controller_pos.x,
+                                Y = left_controller_pos.y,
+                                Z = left_controller_pos.z
+                            },
+                            Rotation = new ADS.Rotation
+                            {
+                                X = left_controller_rot.x,
+                                Y = left_controller_rot.y,
+                                Z = left_controller_rot.z,
+                                W = left_controller_rot.w
+                            }
+                        },
+                        RightJoystick = new ADS.Vector2
+                        {
+                            X = right_joystick.x,
+                            Y = right_joystick.y
+                        },
+                        LeftJoystick = new ADS.Vector2
+                        {
+                            X = left_joystick.x,
+                            Y = left_joystick.y
+                        }
+                    }
+                };
+                byte[] data = request.ToByteArray();
+                continuous_input_client.Send(data, data.Length, server_endpoint);
             }
             catch (Exception e)
             {
@@ -202,19 +325,19 @@ public class OculusClient : MonoBehaviour
             try {
                 //if left controller primary button pushed, send to send right away
                 bool new_state = device_watcher.GetLeftControllerPrimaryButtonPushed();
-                string btn_message;
                 if (current_discrete_state["LeftPrimaryButton"] != new_state)
                 {
                     current_discrete_state["LeftPrimaryButton"] = new_state;
+                    ADS.Request request = new ADS.Request { Type = ADS.Request.Types.Type.Discrete };
                     if (new_state) // if button pushed
                     {
-                        btn_message = Constants.DISCRETE + " " + "left hand primary button pushed :)";
+                        request.Message = "left hand primary button pushed :)";
                     }
                     else
                     {
-                        btn_message = Constants.DISCRETE + " " + "left hand primary released";
+                        request.Message = "left hand primary released";
                     }
-                    byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+                    byte[] bytes = request.ToByteArray();
                     discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
                 }
 
@@ -224,15 +347,16 @@ public class OculusClient : MonoBehaviour
                 {
                     // trigger event
                     current_discrete_state["LeftSecondaryButton"] = new_state;
+                    ADS.Request request = new ADS.Request { Type = ADS.Request.Types.Type.Discrete };
                     if (new_state) // if button pushed
                     {
-                        btn_message = Constants.DISCRETE + " " + "left hand secondary button pushed :)";
+                        request.Message = "left hand secondary button pushed :)";
                     }
                     else
                     {
-                        btn_message = Constants.DISCRETE + " " + "left hand secondary button released :)";
+                        request.Message = "left hand secondary button released :)";
                     }
-                    byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+                    byte[] bytes = request.ToByteArray();
                     discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
                 }
 
@@ -241,15 +365,16 @@ public class OculusClient : MonoBehaviour
                 {
                     // trigger event
                     current_discrete_state["RightPrimaryButton"] = new_state;
+                    ADS.Request request = new ADS.Request { Type = ADS.Request.Types.Type.Discrete };
                     if (new_state) // if button pushed
                     {
-                        btn_message = Constants.DISCRETE + " " + "right hand primary button pushed :)";
+                        request.Message = "right hand primary button pushed :)";
                     }
                     else
                     {
-                        btn_message = Constants.DISCRETE + " " + "right hand primary button released :)";
+                        request.Message = "right hand primary button released :)";
                     }
-                    byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+                    byte[] bytes = request.ToByteArray();
                     discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
                 }
 
@@ -258,15 +383,16 @@ public class OculusClient : MonoBehaviour
                 {
                     // trigger event
                     current_discrete_state["RightSecondaryButton"] = new_state;
+                    ADS.Request request = new ADS.Request { Type = ADS.Request.Types.Type.Discrete };
                     if (new_state) // if button pushed
                     {
-                        btn_message = Constants.DISCRETE + " " + "right hand secondary button pushed :)";
+                        request.Message = "right hand secondary button pushed :)";
                     }
                     else
                     {
-                        btn_message = Constants.DISCRETE + " " + "right hand secondary button released :)";
+                        request.Message = "right hand secondary button released :)";
                     }
-                    byte[] bytes = Encoding.UTF8.GetBytes(btn_message);
+                    byte[] bytes = request.ToByteArray();
                     discrete_input_client.Send(bytes, bytes.Length, server_endpoint);
                 }
             }

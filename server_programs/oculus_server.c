@@ -15,6 +15,7 @@
 #include "spu_alarm.h"
 #include "math.h"
 #include <stdbool.h>
+#include "./protoc_generated/game.pb-c.h"
 
 #define SPINES_PORT 8100
 #define MAX_MESS_LEN 2048
@@ -128,6 +129,8 @@ struct Request {
     char player_name[MAX_STRING_LEN];
     char lobby[MAX_STRING_LEN];
     char data[MAX_MESS_LEN];
+    struct Avatar player_input;
+    char client_ping_start[MAX_STRING_LEN];
 };
 
 int parse_request(struct Request* request);
@@ -184,7 +187,7 @@ int main(int argc, char *argv[])
     char addr_str_buff[256];
     char response_buff[RESPONSE_SIZE];
     int num, i, j;
-    
+
     // Create temporary buffers for print outs
     printf("Awaiting messages from Oculus...\n");
 
@@ -199,8 +202,10 @@ int main(int argc, char *argv[])
         num = select(FD_SETSIZE, &temp_mask, NULL, NULL, &loop_timeout);
         if (num > 0) {  // Received message
             // Parse request from input bytes
-            request.data_len = recvfrom(sk, request.data, MAX_MESS_LEN, 
+            request.data_len = recvfrom(sk, request.data, MAX_MESS_LEN,
                 0, (struct sockaddr *)&request.from_addr, &dummy_len);
+
+            // unserialization
             parse_request(&request);
 
             // Display that we have received message
@@ -260,10 +265,60 @@ int main(int argc, char *argv[])
 }
 
 int parse_request(struct Request* request) {
-    request->data[request->data_len] = 0;  // make sure data is ended with null-terminator
-    char type_string[MAX_STRING_LEN];
-    sscanf(request->data, "%s %s %s", type_string, request->player_name, request->lobby);
-    request->type = (enum Type) atoi(type_string);
+    // parsing data
+    ADS__Request *msg;         // Request message
+    ADS__Player *player_data;// Submessages
+
+    msg = ads__request__unpack(NULL, request->data_len ,(uint8_t *) request->data); // Deserialize the serialized input
+    if (msg == NULL)
+    {
+        perror("error unpacking incoming message\n");\
+        return 1;
+    }
+
+    request-> type = (enum Type) msg->type; // make sure proto enum is the same
+    strcpy(request->player_name, msg -> player ->player_name);
+    strcpy(request->lobby, msg -> lobby_name);
+
+    // parsing player head
+    request-> player_input.head.pos.x = msg -> player -> headset ->position -> x;
+    request-> player_input.head.pos.y = msg -> player -> headset ->position -> y;
+    request-> player_input.head.pos.z = msg -> player -> headset ->position -> z;
+    request-> player_input.head.quat.x = msg -> player -> headset ->rotation -> x;
+    request-> player_input.head.quat.y = msg -> player -> headset ->rotation -> y;
+    request-> player_input.head.quat.z = msg -> player -> headset ->rotation -> z;
+    request-> player_input.head.quat.w = msg -> player -> headset ->rotation -> w;
+
+    // parsing player left hand
+    request-> player_input.left.transform.pos.x = msg -> player -> left_controller ->position -> x;
+    request-> player_input.left.transform.pos.y = msg -> player -> left_controller ->position -> y;
+    request-> player_input.left.transform.pos.z = msg -> player -> left_controller ->position -> z;
+    request-> player_input.left.transform.quat.x = msg -> player -> left_controller ->rotation -> x;
+    request-> player_input.left.transform.quat.y = msg -> player -> left_controller ->rotation -> y;
+    request-> player_input.left.transform.quat.z = msg -> player -> left_controller ->rotation -> z;
+    request-> player_input.left.transform.quat.w = msg -> player -> left_controller ->rotation -> w;
+
+    // parsing player right hand
+    request-> player_input.right.transform.pos.x = msg -> player -> right_controller ->position -> x;
+    request-> player_input.right.transform.pos.y = msg -> player -> right_controller ->position -> y;
+    request-> player_input.right.transform.pos.z = msg -> player -> right_controller ->position -> z;
+    request-> player_input.right.transform.quat.x = msg -> player -> right_controller ->rotation -> x;
+    request-> player_input.right.transform.quat.y = msg -> player -> right_controller ->rotation -> y;
+    request-> player_input.right.transform.quat.z = msg -> player -> right_controller ->rotation -> z;
+    request-> player_input.right.transform.quat.w = msg -> player -> right_controller ->rotation -> w;
+
+    // parsing player left joystick
+    request-> player_input.left.joystick.x = msg -> player -> left_joystick -> x;
+    request-> player_input.left.joystick.y = msg -> player -> left_joystick -> y;
+
+    // parsing player right joystick
+    request-> player_input.right.joystick.x = msg -> player -> right_joystick -> x;
+    request-> player_input.right.joystick.y = msg -> player -> right_joystick -> y;
+
+    // client_ping_start
+    strcpy( request->client_ping_start, player_data->player_ping_start);
+
+    ads__request__free_unpacked(msg,NULL);
     return 0;
 }
 
@@ -381,11 +436,6 @@ int handle_player_input(struct Context* context, struct Request* request) {
             i++;
         }
 
-    int offset = 3;  // ignore type, name, lobby fields  
-    float numbers[128 - offset];
-    for (k = 0; k < 128 - offset; k++)
-        numbers[k] = atof(number_strings[k + offset]);
-
     int player_idx = -1;
     for (k = 0; k < session->num_players; k++)
         if (strcmp(session->players[k].name, request->player_name) == 0) {
@@ -396,36 +446,10 @@ int handle_player_input(struct Context* context, struct Request* request) {
         return 3;
 
     struct Player* player = &(session->players[player_idx]);
-    player->avatar.head.pos.x = numbers[0];
-    player->avatar.head.pos.y = numbers[1];
-    player->avatar.head.pos.z = numbers[2];
-    player->avatar.head.quat.x = numbers[3];
-    player->avatar.head.quat.y = numbers[4];
-    player->avatar.head.quat.z = numbers[5];
-    player->avatar.head.quat.w = numbers[6];
 
-    player->avatar.left.transform.pos.x = numbers[7];
-    player->avatar.left.transform.pos.y = numbers[8];
-    player->avatar.left.transform.pos.z = numbers[9];
-    player->avatar.left.transform.quat.x = numbers[10];
-    player->avatar.left.transform.quat.y = numbers[11];
-    player->avatar.left.transform.quat.z = numbers[12];
-    player->avatar.left.transform.quat.w = numbers[13];
+    memcpy(&(player->avatar),&(request -> player_input), sizeof(struct Avatar)); // TODO: eliminate unnecessary copy
 
-    player->avatar.right.transform.pos.x = numbers[14];
-    player->avatar.right.transform.pos.y = numbers[15];
-    player->avatar.right.transform.pos.z = numbers[16];
-    player->avatar.right.transform.quat.x = numbers[17];
-    player->avatar.right.transform.quat.y = numbers[18];
-    player->avatar.right.transform.quat.z = numbers[19];
-    player->avatar.right.transform.quat.w = numbers[20];
-
-    player->avatar.left.joystick.x = numbers[21];
-    player->avatar.left.joystick.y = numbers[22];
-    player->avatar.right.joystick.x = numbers[23];
-    player->avatar.right.joystick.y = numbers[24];
-
-    strcpy(player->client_ping_start, number_strings[25 + offset]);
+    strcpy(player->client_ping_start, request -> client_ping_start); // TODO: eliminate unnecessary copy
 
     return 0;
 }
@@ -454,47 +478,116 @@ int format_response(char* response, struct Session* session) {
     struct Player* player;
     struct Transform* transform;
     struct Position* position;
-    char* ptr;
 
-    memset(response, 0, RESPONSE_SIZE);
-    sprintf(response, "%d %s %d\n", (int) DATA, session->lobby, session->num_players);
+    // protobuf
+    void *buf;
+    ADS__Response response_msg = ADS__RESPONSE__INIT; // Protobuf Init
+    ADS__GameObject sphere = ADS__GAME_OBJECT__INIT;
+    ADS__GameObject plane = ADS__GAME_OBJECT__INIT;
+    ADS__Position sphere_pos = ADS__POSITION__INIT;
+    ADS__Position plane_pos = ADS__POSITION__INIT;
+    response_msg.sphere = & sphere;
+    response_msg.plane = & plane;
+    sphere.position = & sphere_pos;
+    plane.position = & plane_pos;
+
+    void* response_buf;  // Buffer to store serialized data
+    unsigned len; // Length of serialized data
+    response_msg.type = ADS__RESPONSE__TYPE__DATA; // type
+    response_msg.session_name = session->lobby; // lobbyname
 
     // Format sphere data
-    ptr = &(response[strlen(response)]);  // point to next writable char in response
-    sprintf(ptr, "SPHERE %0.3f %0.3f %0.3f\n", session->sphere.pos.x, session->sphere.pos.y, session->sphere.pos.z);
+    sphere_pos.x = session->sphere.pos.x;
+    sphere_pos.y = session->sphere.pos.y;
+    sphere_pos.z = session->sphere.pos.z;
 
     // Format plane data
-    ptr = &(response[strlen(response)]);
-    sprintf(ptr, "PLANE %0.3f %0.3f %0.3f\n", session->plane.pos.x, session->plane.pos.y, session->plane.pos.z);
+    plane_pos.x = session->plane.pos.x;
+    plane_pos.y = session->plane.pos.y;
+    plane_pos.z = session->plane.pos.z;
 
+    // Format players
+    response_msg.n_players = session->num_players;
+    ADS__Player ** player_messages;
+    void * player_buf;
+    player_messages = malloc (sizeof (ADS__Player *) * (response_msg.n_players));
     for (int i = 0; i < session->num_players; i++) {
-        player = &(session->players[i]);
-        ptr = &(response[strlen(response)]);
-        sprintf(ptr, "%s ", player->name);
+        player = &(session->players[i]);  // session player
+        player_messages[i] = malloc (sizeof (ADS__Player)); // protobuf player
 
-        ptr = &(response[strlen(response)]);
+        // a lot of protobuf init :(
+        ads__player__init(player_messages[i]);
+        player_messages[i]->player_name = player->name;
+        ADS__DeviceInfo headset = ADS__DEVICE_INFO__INIT;
+        ADS__DeviceInfo right_controller = ADS__DEVICE_INFO__INIT;
+        ADS__DeviceInfo left_controller = ADS__DEVICE_INFO__INIT;
+        ADS__Vector2 left_joystick = ADS__VECTOR2__INIT;
+        ADS__Vector2 right_joystick = ADS__VECTOR2__INIT;
+        player_messages[i]->headset = & headset;
+        player_messages[i]->left_controller = & left_controller;
+        player_messages[i]->right_controller = & right_controller;
+        player_messages[i]->left_joystick = & left_joystick;
+        player_messages[i]->right_joystick = & right_joystick;
+        ads__position__init(headset.position);
+        ads__rotation__init(headset.rotation);
+        ads__position__init(right_controller.position);
+        ads__rotation__init(right_controller.rotation);
+        ads__position__init(left_controller.position);
+        ads__rotation__init(left_controller.rotation);
+        ads__position__init(player_messages[i]->player_offset);
+
+        // headset
         transform = &(player->avatar.head);
-        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f ", 
-            transform->pos.x, transform->pos.y, transform->pos.z, transform->quat.x, transform->quat.y, transform->quat.z, transform->quat.w);
-        
-        ptr = &(response[strlen(response)]); 
+        player_messages[i]->headset->position->x = transform->pos.x; // position
+        player_messages[i]->headset->position->y = transform->pos.y;
+        player_messages[i]->headset->position->z = transform->pos.z;
+        player_messages[i]->headset->rotation->x = transform->quat.x; // rotation
+        player_messages[i]->headset->rotation->y = transform->quat.y;
+        player_messages[i]->headset->rotation->z = transform->quat.z;
+        player_messages[i]->headset->rotation->w = transform->quat.w;
+
+        // left controller
         transform = &(player->avatar.left.transform);
-        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f ", 
-            transform->pos.x, transform->pos.y, transform->pos.z, transform->quat.x, transform->quat.y, transform->quat.z, transform->quat.w);
-        
-        ptr = &(response[strlen(response)]);  
+        player_messages[i]->left_controller->position->x = transform->pos.x; // position
+        player_messages[i]->left_controller->position->y = transform->pos.y;
+        player_messages[i]->left_controller->position->z = transform->pos.z;
+        player_messages[i]->left_controller->rotation->x = transform->quat.x; // rotation
+        player_messages[i]->left_controller->rotation->y = transform->quat.y;
+        player_messages[i]->left_controller->rotation->z = transform->quat.z;
+        player_messages[i]->left_controller->rotation->w = transform->quat.w;
+
+        // right controller
         transform = &(player->avatar.right.transform);
-        sprintf(ptr, "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f ", 
-            transform->pos.x, transform->pos.y, transform->pos.z, transform->quat.x, transform->quat.y, transform->quat.z, transform->quat.w);
+        player_messages[i]->right_controller->position->x = transform->pos.x; // position
+        player_messages[i]->right_controller->position->y = transform->pos.y;
+        player_messages[i]->right_controller->position->z = transform->pos.z;
+        player_messages[i]->right_controller->rotation->x = transform->quat.x; // rotation
+        player_messages[i]->right_controller->rotation->y = transform->quat.y;
+        player_messages[i]->right_controller->rotation->z = transform->quat.z;
+        player_messages[i]->right_controller->rotation->w = transform->quat.w;
 
-        ptr = &(response[strlen(response)]);  
+        // player offset
         position = &(player->avatar.offset);
-        sprintf(ptr, "%0.3f %0.3f %0.3f ", position->x, position->y, position->z);
+        player_messages[i]->player_offset->x = position->x;
+        player_messages[i]->player_offset->y = position->y;
+        player_messages[i]->player_offset->z = position->z;
 
-        ptr = &(response[strlen(response)]);  
-        sprintf(ptr, "%s\n", player->client_ping_start);
+        player_messages[i]->player_ping_start = player->client_ping_start;
     }
-    response[strlen(response) - 1] = '\0';  // remove last newline
+    response_msg.players =  player_messages;
+    len = ads__response__get_packed_size(&response_msg); // This is the calculated packing length
+    buf = malloc (len);
+    ads__response__pack(&response_msg, buf);
+
+    memcpy(response, &response_msg, len); // TODO: data copy
+
+    fprintf(stderr,"Writing %d serialized bytes\n",len);
+    fwrite (buf, len, 1, stdout);
+    free(buf);
+    for (int i = 1; i < session->num_players; i++)
+        free (player_messages[i]);
+    free (player_messages);
+
     return 0;
 }
 
@@ -561,17 +654,68 @@ int handle_player_leave(struct Context* context, struct Request* request) {
         printf("Lobby \"%s\" has been closed\n", request->lobby);
     } else {
         // Send message to all other players that player has left
-        char leave_message[256];
-        char current_message[250];
-        sprintf(current_message, "%d %s %d", (int) LOBBY, session->lobby, session->num_players);
-        for (int i = 0; i < session->num_players; i++) {
-            sprintf(leave_message, "%s %s", current_message, session->players[i].name);
-            memcpy(current_message, leave_message, 250);
-        }
-        printf("Sending leave messsage: %s\n", leave_message);
-        for (int i = 0; i < session->num_players; i++) 
-            sendto(context->sk, leave_message, strlen(leave_message), 0, 
-                (struct sockaddr*)&session->players[i].addr, sizeof(struct sockaddr_in));
+
+        // Protobuf serialization
+        // protobuf
+        void *send_buf;
+        ADS__Response response_msg = ADS__RESPONSE__INIT; // Protobuf Init
+        ADS__GameObject sphere = ADS__GAME_OBJECT__INIT;
+        ADS__GameObject plane = ADS__GAME_OBJECT__INIT;
+        ADS__Position sphere_pos = ADS__POSITION__INIT;
+        ADS__Position plane_pos = ADS__POSITION__INIT;
+        response_msg.sphere = & sphere;
+        response_msg.plane = & plane;
+        sphere.position = & sphere_pos;
+        plane.position = & plane_pos;
+
+        void* response_buf;  // Buffer to store serialized data
+        unsigned len; // Length of serialized data
+        response_msg.type = ADS__RESPONSE__TYPE__LOBBY; // type
+        response_msg.session_name = session->lobby; // lobbyname
+
+        // Format players
+        response_msg.n_players = 1;
+        ADS__Player ** player_messages;
+        void * player_buf;
+        player_messages = malloc (sizeof (ADS__Player *) * (response_msg.n_players));
+        int i = 0;
+        player_messages[i] = malloc (sizeof (ADS__Player)); // protobuf player
+
+        // put left player in the players of response
+        ads__player__init(player_messages[i]);
+        player_messages[i]->player_name = request->player_name;
+        // TODO: test: do we need these following inits
+        ADS__DeviceInfo headset = ADS__DEVICE_INFO__INIT;
+        ADS__DeviceInfo right_controller = ADS__DEVICE_INFO__INIT;
+        ADS__DeviceInfo left_controller = ADS__DEVICE_INFO__INIT;
+        ADS__Vector2 left_joystick = ADS__VECTOR2__INIT;
+        ADS__Vector2 right_joystick = ADS__VECTOR2__INIT;
+        player_messages[i]->headset = & headset;
+        player_messages[i]->left_controller = & left_controller;
+        player_messages[i]->right_controller = & right_controller;
+        player_messages[i]->left_joystick = & left_joystick;
+        player_messages[i]->right_joystick = & right_joystick;
+        ads__position__init(headset.position);
+        ads__rotation__init(headset.rotation);
+        ads__position__init(right_controller.position);
+        ads__rotation__init(right_controller.rotation);
+        ads__position__init(left_controller.position);
+        ads__rotation__init(left_controller.rotation);
+        ads__position__init(player_messages[i]->player_offset);
+
+        response_msg.players =  player_messages;
+        len = ads__response__get_packed_size(&response_msg); // This is the calculated packing length
+        send_buf = malloc (len);
+        ads__response__pack(&response_msg, send_buf);
+
+        // send to leave messages
+        for (int k = 0; k < session->num_players; k++)
+            sendto(context->sk, send_buf, strlen(send_buf), 0,
+                (struct sockaddr*)&session->players[k].addr, sizeof(struct sockaddr_in));
+
+        free(send_buf);
+        free(player_messages[i]);
+        free(player_messages);
     }
 
     return 0;

@@ -59,15 +59,50 @@ public class Avatar {
         this.right_controller = (RightHandController) RightHandController.deep_copy(other.right_controller);
     }
 
-    public void update(string server_message)
+    public void update(ADS.Player player_data)
     {
-        string[] infos = server_message.Split(' ');
-        this.avatar_name = infos[0];
-        this.headset_controller = new Headset(StringToVec3(infos[1], infos[2], infos[3]), StringToQuat(infos[4], infos[5], infos[6], infos[7]));
-        this.left_controller = new LeftHandController(StringToVec3(infos[8], infos[9], infos[10]), StringToQuat(infos[11], infos[12], infos[13], infos[14]));
-        this.right_controller = new RightHandController(StringToVec3(infos[15], infos[16], infos[17]), StringToQuat(infos[18], infos[19], infos[20], infos[21]));
-        this.offset = StringToVec3(infos[22], infos[23], infos[24]);
-        this.timestamp = infos[25];
+        this.avatar_name = player_data.PlayerName;
+        this.headset_controller = new Headset(
+            new Vector3(
+                player_data.Headset.Position.X,
+                player_data.Headset.Position.Y,
+                player_data.Headset.Position.Z
+                ),
+            new Quaternion(
+                player_data.Headset.Rotation.X,
+                player_data.Headset.Rotation.Y,
+                player_data.Headset.Rotation.Z,
+                player_data.Headset.Rotation.W
+                )
+            );
+        this.left_controller = new LeftHandController(new Vector3(
+                player_data.LeftController.Position.X,
+                player_data.LeftController.Position.Y,
+                player_data.LeftController.Position.Z
+                ),
+            new Quaternion(
+                player_data.LeftController.Rotation.X,
+                player_data.LeftController.Rotation.Y,
+                player_data.LeftController.Rotation.Z,
+                player_data.LeftController.Rotation.W
+                ));
+        this.right_controller = new RightHandController(new Vector3(
+                player_data.RightController.Position.X,
+                player_data.RightController.Position.Y,
+                player_data.RightController.Position.Z
+                ),
+            new Quaternion(
+                player_data.RightController.Rotation.X,
+                player_data.RightController.Rotation.Y,
+                player_data.RightController.Rotation.Z,
+                player_data.RightController.Rotation.W
+                ));
+        this.offset = new Vector3(
+                player_data.PlayerOffset.X,
+                player_data.PlayerOffset.Y,
+                player_data.PlayerOffset.Z
+            );
+        this.timestamp = player_data.PlayerPingStart;
     }
     
     public static Vector3 StringToVec3(string str_x, string str_y, string str_z){
