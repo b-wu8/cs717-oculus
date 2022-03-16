@@ -10,10 +10,9 @@ using UnityEngine;
 public class Config : MonoBehaviour
 {
     public string remote_ip_address = "NOT_SPECIFIED";
-    public int remote_port;
-    public int local_port;
-    public string player_name;
+    public int remote_port = 0;
+    public string player_name = "john";
     public string lobby = "DEFAULT";
-    public int send_thread_sleep_time = 100;
-    public int receive_thread_sleep_time = 100;
+    public int controller_sleep_ms = 50;
+    public int heartbeat_sleep_ms = 3000;
 }

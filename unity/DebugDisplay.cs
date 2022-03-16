@@ -14,10 +14,6 @@ public class DebugDisplay : MonoBehaviour
     public string stack = "";
     public Text display;
      
-    private void Update() {
-        Debug.Log("time:" + Time.time);
-        Debug.Log(gameObject.name);
-    }
     void OnEnable() {
         Application.logMessageReceivedThreaded += HandleLog;
     }
