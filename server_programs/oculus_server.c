@@ -74,7 +74,7 @@ struct Avatar {
 
 // REMOVEME: sphere moving on a fixed path
 struct Sphere {
-    float t;
+    float t;  // for parameterization
     struct Position pos;
 };
 
@@ -83,33 +83,40 @@ struct Plane {
     struct Position pos;
 };
 
+// This is a logical player struct that represents everything we 
+// know about a given player
 struct Player {
-    int id;
-    char name[MAX_STRING_LEN];
-    char client_ping_start[MAX_STRING_LEN];
-    struct Avatar avatar;
-    struct sockaddr_in addr;
-    struct timeval timestamp;
+    int id;  // unique id assigned to player
+    char name[MAX_STRING_LEN];  // player_name
+    char client_ping_start[MAX_STRING_LEN];  // used to time ping messages
+    struct Avatar avatar;  // avatar to be constructed on client-side
+    struct sockaddr_in addr;  // address to send messages to
+    struct timeval timestamp;  // time of last heartbeat message (used for timeouts)
 };
 
+// This manages the room that players are in. Session and lobby are used
+// interchangeably
 struct Session {
-    char lobby[MAX_STRING_LEN];
-    int num_players;
-    int has_changed;
-    int timeout_sec;
-    double timestep;
+    char lobby[MAX_STRING_LEN];  // name of lobby/session
+    int next_player_idx;
+    int num_players; 
+    int has_changed;  // boolean to note if server state has changed. if true, we will send update to clients
+    int timeout_sec;  // number of seconds before we kick player for timeout
+    double timestep;  // timestep (in seconds) for the lobby
     struct Player players[MAX_NUM_PLAYERS];  // Dynamically allocate memory later
-    struct Sphere sphere;
-    struct Plane plane;
+    struct Sphere sphere;  // REMOVEME: red sphere moving in circle 
+    struct Plane plane;  // REMOVEME: white plane
 };
 
+// Variable that holds all information for server
 struct Context {
-    struct Session sessions[MAX_NUM_SESSIONS];
-    int num_sessions;
-    double timestep;
-    int sk;
+    struct Session sessions[MAX_NUM_SESSIONS];  // list of lobbies/sessions
+    int num_sessions;  
+    double timestep;  // Default timestep to be given to newly created lobbies
+    int sk;  // socket used to send data
 };
 
+// Types of messages that can be sent or received.
 enum Type {
     UNKNOWN = 0,
     SYN = 1,
@@ -121,6 +128,8 @@ enum Type {
     TEST = 7
 };
 
+// Request struct received from client
+// FIXME: will likely be changed by protobuf
 struct Request {
     enum Type type;
     struct sockaddr_in from_addr;
@@ -130,33 +139,84 @@ struct Request {
     char data[MAX_MESS_LEN];
 };
 
+// When a message is received, the contents is stored in request.data. 
+// This function parses the request.data field to populate the Request struct
+// request -> request received from client
+// returns 0 (always)
 int parse_request(struct Request* request);
+
+// Format a response buffer to be sent to the entire session. This response
+// buffer contains the state of all players whihc needs to be updated
+// response -> response byte stream to send to clients in session
+// session -> lobby that response is being sent to
+// returns 0 (always)
 int format_response(char* response, struct Session* session);
+
+// Given a request, populate a pointer to the session that the 
+// player is in.
+// session -> pointer to session pointer. This will be populated inside
+//  the function if ret = 0 or 1. The session will be the session that
+//  the request->lobby specifies
+// context -> global context
+// request -> request from client
+// returns 0 if lobby exists and player is in lobby, 1 if lobby exists
+//  and player is not in lobby. 2 if lobby doesn't exist
 int get_player_session(struct Session** session, struct Context* context, struct Request* request);
+
+// Remove any players in any sessions who have timed out
+// context -> global context
+// returns number of players removed
 int remove_players_if_timeout(struct Context* context);
+
+// TO BE DEPRECATED in lieu of LocomotionDriver on client-side
 int apply_movement_step(struct Session* session);
 
-// setup functions
+// Parse command line arguments to setup receive socket from which 
+// the server will receive information from oculus clients
+// sk -> pointer to socket id which will be populated
+// ip -> string representation of IP Address
+// port -> string representation of port number
+// return 0 if socket is properly opened, 1 if address can't be found,
+//  2 if socket can't be accessed.
 int setup_recv_socket(int* sk, char* ip, char* port);
+
+// Parse command line argument to determine server tick delay
+// timeout -> timeval struct to be populated. This struct will be used
+//  in main for-loop to control how often serevr messages back to clients
+// timeout_ms -> millisecond representation of timeout
+// tick_delay_ms -> string representation of timout
 int setup_timeout(struct timeval* timeout, int* timeout_ms, char* tick_delay_ms);
 
-// request handlers
+// TO BE DEPRECATED: move sphere on server side
+void move_sphere(struct Sphere* sphere, int timeout_ms);
+
+// Add a player to a session/lobby
+// session -> session to add player to
+// request -> contains information about player name
+// returns pointer to player that was just added
+struct Player* add_player_to_lobby(struct Session* session, struct Request* request);
+
+// Add a session to the global context
+// context -> global context
+// request -> contains information about lobby name
+// returns pointer to session that was just created
+struct Session* add_lobby_to_context(struct Context* context, struct Request* request);
+
+// Helper function used to format sockaddr_in structs
+// format is like <ip>:<port> (e.x. "12.34.56.78:1234")
+void format_addr(char *buf, struct sockaddr_in* addr);
+
+// The following request handlers handle messages sent from the client
 int handle_player_join(struct Context* context, struct Request* request);
 int handle_player_input(struct Context* context, struct Request* request);
 int handle_player_heartbeat(struct Context* context, struct Request* request);
 int handle_player_leave(struct Context* context, struct Request* request);
 
-// simplicity functions
-void move_sphere(struct Sphere* sphere, int timeout_ms);
-struct Player* add_player_to_lobby(struct Session* session, struct Request* request);
-struct Session* add_lobby_to_context(struct Context* context, struct Request* request);
-void format_addr(char *buf, struct sockaddr_in* addr);
-
 int main(int argc, char *argv[])
 {
+    // Variables used to parse command line arguments
     int sk, timeout_ms;
     struct timeval timeout;
-    fd_set mask, temp_mask;
 
     // Verify command line invocation
     if(argc != 4){
@@ -171,19 +231,22 @@ int main(int argc, char *argv[])
         exit(1);  // Error is printed within setup_timeout()
 
     // Server forloop variables
+    fd_set mask, temp_mask;
     struct sockaddr_in* addr;
     struct Session* session;
     struct timeval loop_timeout;
     socklen_t dummy_len;
     struct Request request;
     memset(&request, 0, sizeof(struct Request));
+    char addr_str_buff[256];
+    char response_buff[RESPONSE_SIZE];
+    int num, i, j;
+
+    // Setup global context
     struct Context context;
     memset(&context, 0, sizeof(struct Context));
     context.timestep = ((double) timeout_ms) / 1000;
     context.sk = sk;
-    char addr_str_buff[256];
-    char response_buff[RESPONSE_SIZE];
-    int num, i, j;
     
     // Create temporary buffers for print outs
     printf("Awaiting messages from Oculus...\n");
@@ -194,7 +257,7 @@ int main(int argc, char *argv[])
     memcpy(&loop_timeout, &timeout, sizeof(struct timeval));
     for (;;)
     { 
-        // Receive packet
+        // Block until we receive a packet or timeout
         temp_mask = mask;
         num = select(FD_SETSIZE, &temp_mask, NULL, NULL, &loop_timeout);
         if (num > 0) {  // Received message
@@ -224,7 +287,7 @@ int main(int argc, char *argv[])
                     handle_player_heartbeat(&context, &request);
                     break;
                 case TEST:
-                    printf("%s\n", request.data);
+                    // printf("%s\n", request.data);
                     break;
                 default:
                     break;
@@ -234,21 +297,21 @@ int main(int argc, char *argv[])
             remove_players_if_timeout(&context);
             for (i = 0; i < context.num_sessions; i++) {
                 session = &context.sessions[i];
-                apply_movement_step(session);
+                apply_movement_step(session);  // move players based on joystick data (to be removed)
                 if (session->has_changed) {
                     format_response(response_buff, session);
-                    printf("sending %d byte response to lobby \"%s\": %s\nSent to: ", 
-                        (int) strlen(response_buff), session->lobby, response_buff);
+                    // printf("sending %d byte response to lobby \"%s\": %s\nSent to: ", 
+                    //     (int) strlen(response_buff), session->lobby, response_buff);
                     for (j = 0; j < session->num_players; j++) {
                         addr = &(session->players[j].addr);
                         sendto(sk, response_buff, strlen(response_buff), 
                             0, (struct sockaddr*)addr, sizeof(struct sockaddr_in));
 
                         // Print address we are responding to
-                        format_addr(addr_str_buff, addr);
-                        printf("%s ", addr_str_buff);
+                        // format_addr(addr_str_buff, addr);
+                        // printf("%s ", addr_str_buff);
                     }
-                    printf("\n");
+                    // printf("\n");
                     session->has_changed = 0;
                 }
                 move_sphere(&session->sphere, timeout_ms);
@@ -274,13 +337,26 @@ void move_sphere(struct Sphere* sphere, int timeout_ms) {
     sphere->pos.z = 4 * sin(sphere->t);
 }
 
-struct Player* add_player_to_lobby(struct Session* session, struct Request* request) {
+struct Player* add_player_to_lobby(struct Session* session, struct Request* request) {    
+    // Give the player the next index number such that is has no collisions with 
+    // other players modulo MAX_NUM_PLAYERS. Thus, the client-side can use pid mod
+    // MAX_NUM_PLAYERS to uniquiely select a color for the avatar.
+    int player_idx_mod_n[MAX_NUM_PLAYERS];
+    memset(player_idx_mod_n, 0, sizeof(player_idx_mod_n));
+    for (int i = 0; i < session->num_players; i++)
+        player_idx_mod_n[session->players[i].id % MAX_NUM_PLAYERS] = 1;
+    int max_tries = MAX_NUM_PLAYERS;
+    while (player_idx_mod_n[session->next_player_idx % MAX_NUM_PLAYERS] && max_tries-- > 0)
+        session->next_player_idx++;
+
     struct Player* player = &session->players[session->num_players];
-    memcpy(&player->addr, &request->from_addr, sizeof(struct sockaddr_in));
+    player->id = session->next_player_idx++;
+    memcpy(&player->addr, &request->from_addr, sizeof(struct sockaddr_in));  // Set player address for responses
     strcpy(player->name, request->player_name);
-    player->avatar.offset.y = 1.5;  // Make everyone the same height ?
-    gettimeofday(&player->timestamp, NULL);
+    player->avatar.offset.y = 1.5;  // FIXME: Make everyone the same height ?
+    gettimeofday(&player->timestamp, NULL);  // Start timer for player timeout
     session->num_players++;
+    session->has_changed = 1; // Ensures updates are sent out in next server tick
     printf("Player \"%s\" joined lobby \"%s\" (%d/%d)\n", 
         request->player_name, request->lobby, session->num_players, MAX_NUM_PLAYERS);
     return player;
@@ -291,8 +367,8 @@ struct Session* add_lobby_to_context(struct Context* context, struct Request* re
     strcpy(session->lobby, request->lobby);
     move_sphere(&session->sphere, 1);
     session->timestep = context->timestep;
-    session->plane.pos.x = session->plane.pos.y = session->plane.pos.z = 0;
-    session->has_changed = 1;
+    session->plane.pos.x = session->plane.pos.y = session->plane.pos.z = 0;  // set plane position
+    session->has_changed = 1; // Ensures updates are sent out in next server tick
     session->timeout_sec = DEFAULT_TIMEOUT_SEC;
     context->num_sessions++;
     printf("Lobby \"%s\" has been created (0/%d)\n", request->lobby, MAX_NUM_PLAYERS);
@@ -303,6 +379,9 @@ int remove_players_if_timeout(struct Context* context) {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
 
+    // removal_requests will store artificial requests
+    // that we make to remove players. This way we can use
+    // the handle_player_leave logic.
     struct Request removal_requests[MAX_TOTAL_PLAYERS];
     memset(removal_requests, 0, sizeof(removal_requests));
     int num_timeouts = 0;
@@ -313,6 +392,7 @@ int remove_players_if_timeout(struct Context* context) {
         for (int j = 0; j < session->num_players; j++) 
             if (current_time.tv_sec - session->players[j].timestamp.tv_sec > session->timeout_sec) {
                 // Player j in session i has timed out
+                // Create a request as if this player has requested to leave the lobby
                 sprintf(removal_requests[num_timeouts].data, "%d %s %s", (int) FIN, session->players[j].name, session->lobby);
                 strcpy(removal_requests[num_timeouts].player_name, session->players[j].name);
                 strcpy(removal_requests[num_timeouts].lobby, session->lobby);
@@ -331,6 +411,11 @@ int remove_players_if_timeout(struct Context* context) {
 
 int apply_movement_step(struct Session* session) {
     struct Avatar* avatar;
+    // Joystick values read between -1 and 1. If the magnitude
+    // is less than 0.2, then don't move in that direction. 
+    // Otherwise, move proportional to the magnitude. Currently,
+    // the velocity is implicit as one "unit" per second. Unity units are
+    // technically in meters. 
     for (int j = 0; j < session->num_players; j++) {
         avatar = &session->players[j].avatar;      
         if (fabs(avatar->right.joystick.y) > 0.2)
@@ -348,10 +433,13 @@ int handle_player_heartbeat(struct Context* context, struct Request* request) {
         // Couldn't find player
         return ret;
 
+    // Find player in lobby, restart their timeout timer, and send the heartbeat
+    // message back to them, so they know the server is alive.
     for (int i = 0; i < session->num_players; i++)
         if (strcmp(session->players[i].name, request->player_name) == 0) {
             gettimeofday(&session->players[i].timestamp, NULL);
-            sendto(context->sk, request->data, request->data_len, 0, (struct sockaddr*)&session->players[i].addr, sizeof(struct sockaddr_in));
+            sendto(context->sk, request->data, request->data_len, 
+                0, (struct sockaddr*)&session->players[i].addr, sizeof(struct sockaddr_in));
             return 0;
         }
     return 1;
@@ -431,6 +519,8 @@ int handle_player_input(struct Context* context, struct Request* request) {
 }
 
 int get_player_session(struct Session** session, struct Context* context, struct Request* request) {
+    // Find lobby in context. Then find player in lobby. We use strcmp on the lobby 
+    // name and player name. This is probably not good, but it works for now.
     for (int i = 0; i < context->num_sessions; i++) {
         if (strcmp(request->lobby, context->sessions[i].lobby) == 0) {
             for (int j = 0; j < context->sessions[i].num_players; j++) {
@@ -451,6 +541,8 @@ int get_player_session(struct Session** session, struct Context* context, struct
 }
 
 int format_response(char* response, struct Session* session) {
+    // This function will be overwritten when we use protobuff
+
     struct Player* player;
     struct Transform* transform;
     struct Position* position;
@@ -467,6 +559,7 @@ int format_response(char* response, struct Session* session) {
     ptr = &(response[strlen(response)]);
     sprintf(ptr, "PLANE %0.3f %0.3f %0.3f\n", session->plane.pos.x, session->plane.pos.y, session->plane.pos.z);
 
+    // Iterate through each player
     for (int i = 0; i < session->num_players; i++) {
         player = &(session->players[i]);
         ptr = &(response[strlen(response)]);
@@ -560,7 +653,8 @@ int handle_player_leave(struct Context* context, struct Request* request) {
         context->num_sessions--;
         printf("Lobby \"%s\" has been closed\n", request->lobby);
     } else {
-        // Send message to all other players that player has left
+        // Send message to all other players to tell them who is still
+        // in lobby
         char leave_message[256];
         char current_message[250];
         sprintf(current_message, "%d %s %d", (int) LOBBY, session->lobby, session->num_players);
