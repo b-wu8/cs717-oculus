@@ -253,8 +253,10 @@ public class OculusClient : MonoBehaviour
     private void HandleLeftPrimaryButtonEvent(bool is_pushed) {
         string btn_message;
         current_discrete_state[OculusButtons.LEFT_PRIMARY_BUTTON] = is_pushed;
-        if (is_pushed) // if button pushed
+        if (is_pushed) {  // Change state of debug canvas on left primary push (X Button)
+            view.display_debug = !view.debug_canvas.activeSelf;
             btn_message = MessageTypes.TEST + " " + "left hand primary button pushed :)";
+        }
         else
             btn_message = MessageTypes.TEST + " " + "left hand primary released";
         byte[] bytes = Encoding.UTF8.GetBytes(btn_message);

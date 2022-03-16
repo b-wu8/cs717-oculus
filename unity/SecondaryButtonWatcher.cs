@@ -43,6 +43,7 @@ public class SecondaryButtonWatcher : MonoBehaviour
     void Update()
     {
         // if right hand or left hand secondary button pushed
+        /*
         bool tempState = deviceInfoWatcher.GetRightControllerSecondaryButtonPushed();
         tempState |= deviceInfoWatcher.GetLeftControllerSecondaryButtonPushed();
         if (tempState != lastButtonState) // Button state changed since last frame AND its pushed
@@ -50,6 +51,7 @@ public class SecondaryButtonWatcher : MonoBehaviour
             secondaryButtonPress.Invoke(tempState);
             lastButtonState = tempState;
         }
+        */
     }
 
     void ShowOrHideLog(bool pushed)
