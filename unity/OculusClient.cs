@@ -12,6 +12,25 @@ using System.Collections.Generic;
 using UnityEngine.UI;
 using UnityEngine.XR;
 
+/*
+ * Types to classify what kind of message is being sent.
+ */
+static class Constants
+{
+    // startup message indicates that a player is trying to connect to room
+    // the player name is mapped to the included IP address
+    public const int SYN = 1;
+    // controller input message
+    public const int INPUT = 2;
+    // player formally quits
+    public const int FIN = 3;
+    public const int HEARTBEAT = 4;
+    public const int DATA = 5;
+    public const int LEAVE = 6;
+    public const int DISCRETE = 7;
+    public const int CONTINUE = 8;
+}
+
 public class OculusClient : MonoBehaviour
 {
     public Config config;

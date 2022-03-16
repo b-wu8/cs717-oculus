@@ -12,28 +12,6 @@ using System.Text;
 using System;
 using System.Threading;
 
-/*
-static class DeviceInput
-{
-    public const string RIGHT_PRIMARY_BUTTON = "RIGHT_PRIMARY_BUTTON";
-    public const string RIGHT_SECOND_BUTTON = "RIGHT_SECOND_BUTTON";
-    public const string LEFT_PRIMARY_BUTTON = "LEFT_PRIMARY_BUTTON";
-    public const string LEFT_SECOND_BUTTON = "LEFT_SECOND_BUTTON";
-
-    public const string RIGHT_CONTROLLER_POSITION = "RIGHT_CONTROLLER_POSITION";
-    public const string RIGHT_CONTROLLER_ROTATION = "RIGHT_CONTROLLER_ROTATION";
-    public const string LEFT_CONTROLLER_POSITION = "LEFT_CONTROLLER_POSITION";
-    public const string LEFT_CONTROLLER_ROTATION = "LEFT_CONTROLLER_ROTATION";
-
-    public const string HEADSET_POSITION = "HEADSET_POSITION";
-    public const string HEADSET_ROTATION = "HEADSET_ROTATION";
-
-    public const string LEFT_JOYSTICK_POSITION = "LEFT_JOYSTICK_POSITION";
-    public const string RIGHT_JOYSTICK_POSITION = "RIGHT_JOYSTICK_POSITION";
-}
-*/
-
-[System.Serializable]
 public class DeviceInfoWatcher : MonoBehaviour
 {
     // input devices
@@ -52,10 +30,6 @@ public class DeviceInfoWatcher : MonoBehaviour
             InputDevices_deviceConnected(device);
         InputDevices.deviceConnected += InputDevices_deviceConnected;
         InputDevices.deviceDisconnected += InputDevices_deviceDisconnected;
-
-        //boolean_inputs = new Dictionary<string, Func<bool>>();
-        //boolean_inputs[DeviceInput.RIGHT_PRIMARY_BUTTON] =
-
     }
 
     void OnDisable()
@@ -71,44 +45,32 @@ public class DeviceInfoWatcher : MonoBehaviour
             head_device = device;
             head_connected = true;
         } else
-        {
-            // Debug.Log("Head not found");
-        }
+            Debug.Log("Headset not found");
         if ((device.characteristics & InputDeviceCharacteristics.Left) == InputDeviceCharacteristics.Left)
         {
             left_controller = device;
             left_connected = true;
         }
         else
-        {
-            // Debug.Log("left controller not found");
-        }
+            Debug.Log("Left controller not found");
         if ((device.characteristics & InputDeviceCharacteristics.Right) == InputDeviceCharacteristics.Right)
         {
             right_controller = device;
             right_connected = true;
         }
         else
-        {
-            // Debug.Log("right controller not found");
-        }
+            Debug.Log("Right controller not found");
     }
 
     private void InputDevices_deviceDisconnected(InputDevice device)
     {
-        // Debug.Log("Device disconnected: " + device);
+        Debug.Log("Device disconnected: " + device);
         if(device == head_device)
-        {
             head_connected = false;
-        }
         else if (device == right_controller)
-        {
             right_connected = false;
-        }
         else if (device == left_controller)
-        {
             left_connected = false;
-        }
     }
 
     public string GetControllerData() {
@@ -145,7 +107,7 @@ public class DeviceInfoWatcher : MonoBehaviour
     // get head position
     public Vector3 GetHeadPosition()
     {
-        Vector3 headset_pos = new Vector3(0.0f, 0.0f, 0.0f);
+        Vector3 headset_pos = Vector3.zero;
 
         if (!head_connected)
             return headset_pos;
@@ -157,7 +119,7 @@ public class DeviceInfoWatcher : MonoBehaviour
     // get head rotation
     public Quaternion GetHeadRotation()
     {
-        Quaternion headset_rot = new Quaternion(0.0f, 0.0f, 0.0f, 0.0f);
+        Quaternion headset_rot = Quaternion.identity;
 
         if (!head_connected)
             return headset_rot;
@@ -216,7 +178,7 @@ public class DeviceInfoWatcher : MonoBehaviour
     // get right controller position
     public Vector3 GetRightControllerPosition()
     {
-        Vector3 right_controller_pos = new Vector3(0.0f, 0.0f, 0.0f);
+        Vector3 right_controller_pos = Vector3.zero;
 
         if (!right_connected)
             return right_controller_pos;
@@ -229,7 +191,7 @@ public class DeviceInfoWatcher : MonoBehaviour
     // get left controller position
     public Vector3 GetLeftControllerPosition()
     {
-        Vector3 left_controller_pos = new Vector3(0.0f, 0.0f, 0.0f);
+        Vector3 left_controller_pos = Vector3.zero;
 
         if (!left_connected)
             return left_controller_pos;
@@ -241,7 +203,7 @@ public class DeviceInfoWatcher : MonoBehaviour
     // get right controller rotation
     public Quaternion GetRightControllerRotation()
     {
-        Quaternion right_rot = new Quaternion(0.0f, 0.0f, 0.0f, 0.0f);
+        Quaternion right_rot = Quaternion.identity;
 
         if (!right_connected)
             return right_rot;
@@ -253,7 +215,7 @@ public class DeviceInfoWatcher : MonoBehaviour
     // get left controller rotation
     public Quaternion GetLeftControllerRotation()
     {
-        Quaternion left_rot = new Quaternion(0.0f, 0.0f, 0.0f, 0.0f);
+        Quaternion left_rot = Quaternion.identity;
 
         if (!left_connected)
             return left_rot;
@@ -265,13 +227,13 @@ public class DeviceInfoWatcher : MonoBehaviour
     // get right joystick
     public Vector2 GetRightJoystickVec2()
     {
-        Vector2 right_joystick_vec2 = new Vector2(0.0f, 0.0f);
+        Vector2 right_joystick_vec2 = Vector2.zero;
 
         if (!right_connected)
         {
             return right_joystick_vec2;
         }
-        // get right controller position
+
         right_controller.TryGetFeatureValue(CommonUsages.primary2DAxis, out right_joystick_vec2);
         return right_joystick_vec2;
     }
@@ -279,7 +241,7 @@ public class DeviceInfoWatcher : MonoBehaviour
     // get left joystick
     public Vector2 GetLeftJoystickVec2()
     {
-        Vector2 left_joystick_vec2 = new Vector2(0.0f, 0.0f);
+        Vector2 left_joystick_vec2 = Vector2.zero;
 
         if (!left_connected)
             return left_joystick_vec2;
@@ -358,5 +320,144 @@ public class DeviceInfoWatcher : MonoBehaviour
             // Debug.Log("Left controller Joystick: " + left_joystick_vec2.ToString("F2"));
         }
         return new LeftJoystick(left_joystick_vec2);
+    }
+}
+
+public class TrackableDevice 
+{
+    public Vector3 position;
+    public Quaternion rotation;
+
+    public TrackableDevice(Vector3 pos, Quaternion rot)
+    {
+        this.position.x = pos.x;
+        this.position.y = pos.y;
+        this.position.z = pos.z;
+        this.rotation.x = rot.x;
+        this.rotation.y = rot.y;
+        this.rotation.z = rot.z;
+        this.rotation.w = rot.w;
+    }
+
+    public TrackableDevice()
+    {
+        this.position.x = 0;
+        this.position.y = 0;
+        this.position.z = 0;
+        this.rotation.x = 0;
+        this.rotation.y = 0;
+        this.rotation.z = 0;
+        this.rotation.w = 0;
+    }
+
+    /*
+     * Serializes metadata in string format.
+     */
+    public string to_string() 
+    {
+        string data = System.String.Empty;
+        data += this.position.x + " " + 
+                this.position.y + " " + 
+                this.position.z + " ";
+        data += this.rotation.x + " " + 
+                this.rotation.y + " " + 
+                this.rotation.z + " " + 
+                this.rotation.w;
+        return data;
+    }
+
+    /*
+     * Creates a deep copy of the class.
+     */
+    public static TrackableDevice deep_copy(TrackableDevice device) 
+    {
+        return new TrackableDevice(device.position, device.rotation);
+    }
+}
+
+public class Headset : TrackableDevice
+{
+    public Headset(): base() {}
+    public Headset(Vector3 pos, Quaternion rot) : base(pos, rot)
+    {
+    }
+}
+
+public class LeftHandController : TrackableDevice
+{
+    public LeftHandController(): base() {}
+
+    public LeftHandController(Vector3 pos, Quaternion rot) : base(pos, rot)
+    {
+    }
+
+}
+
+public class RightHandController : TrackableDevice
+{
+    public RightHandController() : base() { }
+    public RightHandController(Vector3 pos, Quaternion rot) : base(pos, rot)
+    {
+    }
+}
+
+/* 
+ * Each of the joysticks on the device controllers.
+ */
+public class Joystick {
+    public Vector2 position;
+    public Joystick()
+    {
+        this.position.x = 0;
+        this.position.y = 0;
+    }
+    public Joystick(Vector2 pos)
+    {
+        this.position.x = pos.x;
+        this.position.y = pos.y;
+    }
+
+    /*
+     * Serialize joystick movement metadata as a string.
+     */
+    public string to_string() 
+    {
+        string data = System.String.Empty;
+        data += this.position.x + " " + 
+                this.position.y;
+        return data;
+    }
+
+    /*
+     * Creates a deep copy of the class.
+     */
+    public Joystick deep_copy(Joystick device) 
+    {
+        return new Joystick(device.position);
+    }
+}
+
+public class LeftJoystick : Joystick
+{
+    public LeftJoystick() : base() {}
+    public LeftJoystick(Vector2 pos) : base(pos)
+    {
+    }
+}
+
+public class RightJoystick : Joystick
+{
+    public RightJoystick() : base() {}
+    public RightJoystick(Vector2 pos) : base(pos)
+    {
+    }
+}
+
+public class Timestamp
+{
+    public DateTime time;
+    public Timestamp(DateTime t)
+    {
+        time = t;
     }
 }
